@@ -14,6 +14,7 @@ Usage:
 import json
 import os
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -70,19 +71,23 @@ def compute_stats(df: pd.DataFrame) -> dict:
     # ── Section 4: Salary by role ─────────────────────────────────────────────
     sal_by_role = {"labels": [], "values": []}
     if has_salary:
-        avg_sal = (df.groupby("job_title")["salary_lpa"]
-                    .mean().sort_values(ascending=False).head(8))
+        avg_sal = cast(pd.Series, df.groupby("job_title")["salary_lpa"].mean())
+        avg_sal = avg_sal.sort_values(ascending=False).head(8)
         sal_by_role = {
-            "labels": [t[:30] + "…" if len(t) > 30 else t for t in avg_sal.index.tolist()],
-            "values": [round(v, 1) for v in avg_sal.values],
+            "labels": [t[:30] + "…" if len(t) > 30 else t
+                       for t in (str(i) for i in avg_sal.index.tolist())],
+            "values": [round(float(v), 1) for v in avg_sal.values],
         }
 
     # ── Section 4: Experience vs Salary scatter ───────────────────────────────
     scatter_exp_sal = []
     if has_salary and "experience_years" in df.columns:
         extra_cols = [c for c in ["job_title", "company", "city"] if c in df.columns]
-        sc = df[["experience_years", "salary_lpa"] + extra_cols].dropna(subset=["experience_years", "salary_lpa"])
-        sc = sc[(sc["salary_lpa"] >= 1.0) & (sc["experience_years"] >= 0) & (sc["experience_years"] <= 20)]
+        sc = cast(pd.DataFrame, df[["experience_years", "salary_lpa"] + extra_cols])
+        sc = sc.dropna(subset=["experience_years", "salary_lpa"])
+        sc = cast(pd.DataFrame, sc.loc[
+            (sc["salary_lpa"] >= 1.0) & (sc["experience_years"] >= 0) & (sc["experience_years"] <= 20)
+        ])
         if len(sc) > 0:
             q3  = sc["salary_lpa"].quantile(0.75)
             iqr = q3 - sc["salary_lpa"].quantile(0.25)
@@ -125,10 +130,10 @@ def compute_stats(df: pd.DataFrame) -> dict:
     # ── Section 6: Predictor lookup tables ───────────────────────────────────
     # Apply same salary floor as model.py to remove bad-parse artefacts.
     if has_salary:
-        clean_sal = df[df["salary_lpa"] >= 1.0].copy()
+        clean_sal = cast(pd.DataFrame, df.loc[df["salary_lpa"] >= 1.0]).copy()
         q3  = clean_sal["salary_lpa"].quantile(0.75)
         iqr = q3 - clean_sal["salary_lpa"].quantile(0.25)
-        clean_sal   = clean_sal[clean_sal["salary_lpa"] <= q3 + 3.0 * iqr]
+        clean_sal = cast(pd.DataFrame, clean_sal.loc[clean_sal["salary_lpa"] <= q3 + 3.0 * iqr])
         global_mean = round(clean_sal["salary_lpa"].mean(), 2)
     else:
         clean_sal   = df.copy()

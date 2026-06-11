@@ -245,7 +245,7 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     # Sources like Indeed don't expose experience on the card; rather than
     # dropping those rows, we fill them with the median years seen for the
     # same normalised title (or the global median as a fallback).
-    if "experience_years" in df.columns and df["experience_years"].isna().any():
+    if "experience_years" in df.columns and bool(df["experience_years"].isna().any()):
         # Build a normalised title key for grouping
         df["_title_key"] = (
             df["job_title"].str.lower()
@@ -255,14 +255,14 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         title_medians   = df.groupby("_title_key")["experience_years"].median()
         global_median   = df["experience_years"].median()
         # Fallback when the whole dataset has no experience data (e.g. Indeed-only run)
-        if pd.isna(global_median):
+        if bool(pd.isna(global_median)):
             global_median = 3.0   # reasonable India tech-job default
 
         def _fill_exp(row):
-            if pd.notna(row["experience_years"]):
+            if bool(pd.notna(row["experience_years"])):
                 return row["experience_years"]
             med = title_medians.get(row["_title_key"])
-            return med if pd.notna(med) else global_median
+            return med if bool(pd.notna(med)) else global_median
 
         n_missing = df["experience_years"].isna().sum()
         df["experience_years"] = df.apply(_fill_exp, axis=1)

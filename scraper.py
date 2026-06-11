@@ -472,11 +472,11 @@ def scrape_jsearch(keywords: list[str], pages_per_keyword: int, delay: float) ->
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def scrape(
-    keywords: list[str] = None,
+    keywords: list[str] | None = None,
     pages_per_keyword: int = 2,
     output_path: str = OUTPUT_PATH,
     delay: float = 1.0,
-    source: str = None,
+    source: str | None = None,
 ) -> str:
     """
     Fetch India tech jobs via API and append new results to the CSV.

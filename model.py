@@ -19,6 +19,7 @@ import pickle
 import re
 import warnings
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -94,7 +95,7 @@ def _extract_top_skills(df: pd.DataFrame, n: int = N_SKILLS) -> list[str]:
             s = skill.strip().lower()
             if s and s != "not mentioned" and len(s) > 1:
                 counts[s] = counts.get(s, 0) + 1
-    top = sorted(counts, key=counts.get, reverse=True)[:n]
+    top = sorted(counts, key=lambda k: counts[k], reverse=True)[:n]
     return top
 
 
@@ -240,33 +241,33 @@ def _apply_target_encoding(df: pd.DataFrame, col: str,
     Residual leakage: each row contributes 1/N to its own group mean (negligible
     for large groups; groups < MIN_ENCODER_SAMPLES fall back to global_mean).
     """
-    global_mean = encoders["global_mean"]
+    global_mean = float(encoders["global_mean"])
     group = encoders[col]   # DataFrame with sum/count per category
     known = group.index.tolist()
 
-    def lookup(cat):
+    def lookup(cat: str) -> float:
         if cat in group.index:
             s, c = group.loc[cat, "sum"], group.loc[cat, "count"]
             if c < MIN_ENCODER_SAMPLES:
                 return global_mean
-            return s / c
+            return float(s / c)
         # Strict fuzzy fallback — FUZZY_CUTOFF=0.85 prevents cross-domain
         # mismatches like 'ML Researcher' → 'Teacher' (cutoff=0.4 caused these).
         # Anything below the threshold falls back to global_mean.
         matches = difflib.get_close_matches(cat, known, n=1, cutoff=FUZZY_CUTOFF)
         if matches:
-            return group.loc[matches[0], "sum"] / group.loc[matches[0], "count"]
+            return float(group.loc[matches[0], "sum"] / group.loc[matches[0], "count"])
         return global_mean
 
     # Resolve each UNIQUE category once, then broadcast — the fuzzy fallback is
     # O(categories) per lookup, so per-row mapping was O(rows × categories).
-    col_str = df[col].astype(str)
-    mapping = {cat: lookup(cat) for cat in col_str.unique()}
-    return col_str.map(mapping)
+    col_series = cast(pd.Series, df[col].astype(str))
+    mapping = {cat: lookup(cat) for cat in col_series.unique()}
+    return col_series.map(lambda c: mapping[c])
 
 
-def build_features(df: pd.DataFrame, encoders: dict = None,
-                   top_skills: list = None, fit: bool = True):
+def build_features(df: pd.DataFrame, encoders: dict | None = None,
+                   top_skills: list | None = None, fit: bool = True):
     """
     Full feature engineering pipeline.
     Returns (X DataFrame, encoders dict, top_skills list, feature_cols list)
@@ -293,6 +294,8 @@ def build_features(df: pd.DataFrame, encoders: dict = None,
     # Each column becomes its mean salary — far more informative than a random int.
     if fit:
         encoders = _build_target_encoders(df)
+    if encoders is None:
+        raise ValueError("encoders must be provided when fit=False")
 
     for col in ["job_title", "city", "company"]:
         df[f"{col}_enc"] = _apply_target_encoding(df, col, encoders)
@@ -300,6 +303,8 @@ def build_features(df: pd.DataFrame, encoders: dict = None,
     # ── Multi-hot encode skills ───────────────────────────────────────────────
     if fit:
         top_skills = _extract_top_skills(df, N_SKILLS)
+    if top_skills is None:
+        raise ValueError("top_skills must be provided when fit=False")
     df = _multihot_skills(df, top_skills)
 
     # ── Company tier (ordinal) ────────────────────────────────────────────────
@@ -337,7 +342,7 @@ def _clean_salary(df: pd.DataFrame,
     before = len(df)
 
     # Pass 1: hard floor
-    df = df[df[TARGET_COL] >= 1.0]
+    df = cast(pd.DataFrame, df.loc[df[TARGET_COL] >= 1.0])
     removed_bad = before - len(df)
     if removed_bad:
         print(f"[✓] Dropped {removed_bad} rows with salary < ₹1 LPA (bad parse)")
@@ -349,7 +354,7 @@ def _clean_salary(df: pd.DataFrame,
         iqr = q3 - q1
         high_fence = q3 + 1.5 * iqr
     before2 = len(df)
-    df = df[df[TARGET_COL] <= high_fence]
+    df = cast(pd.DataFrame, df.loc[df[TARGET_COL] <= high_fence])
     removed_high = before2 - len(df)
     if removed_high:
         print(f"[✓] Removed {removed_high} high outliers  (capped at ₹{high_fence:.1f} LPA)")
@@ -380,8 +385,8 @@ def train() -> tuple:
     # 2. build_features() encodes categories with training group means, so
     #    splitting first also prevents target-encoding leakage.
     df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
-    df_train = df_train.reset_index(drop=True)
-    df_test  = df_test.reset_index(drop=True)
+    df_train = cast(pd.DataFrame, df_train).reset_index(drop=True)
+    df_test  = cast(pd.DataFrame, df_test).reset_index(drop=True)
 
     # ── Clean salary — fit bounds on train, apply same bounds to test ─────────
     df_train, high_fence = _clean_salary(df_train)
@@ -394,8 +399,8 @@ def train() -> tuple:
     )
 
     # ── Target: log-transform if enabled ─────────────────────────────────────
-    y_raw_train = df_train[TARGET_COL].values
-    y_raw_test  = df_test[TARGET_COL].values
+    y_raw_train = df_train[TARGET_COL].to_numpy(dtype=float)
+    y_raw_test  = df_test[TARGET_COL].to_numpy(dtype=float)
     if LOG_TRANSFORM_TARGET:
         y_train = np.log1p(y_raw_train)
         y_test  = np.log1p(y_raw_test)
@@ -571,7 +576,7 @@ def predict(job_title: str, city: str, experience_years: float,
     model, encoders, top_skills, feature_cols, log_transform = load_model()
 
     input_df = pd.DataFrame([{
-        "job_title":        _normalize_title(job_title),
+        "job_title":        job_title,
         "city":             city,
         "company":          company,
         "experience_years": float(experience_years),
@@ -585,19 +590,19 @@ def predict(job_title: str, city: str, experience_years: float,
     for col in feature_cols:
         if col not in X.columns:
             X[col] = 0
-    X = X[feature_cols]
+    X_arr = np.asarray(X[feature_cols], dtype=float)
 
     # Confidence interval via individual tree predictions (RF only; XGBoost falls back to ±15%)
     try:
         trees = model.estimators_   # AttributeError for XGBRegressor → except branch
-        tree_preds = np.array([t.predict(X.values)[0] for t in trees])
+        tree_preds = np.array([t.predict(X_arr)[0] for t in trees])
         if log_transform:
             tree_preds = np.expm1(tree_preds)
         predicted = round(float(np.mean(tree_preds)), 2)
         low       = round(float(np.percentile(tree_preds, 10)), 2)
         high      = round(float(np.percentile(tree_preds, 90)), 2)
     except AttributeError:
-        raw_pred = float(model.predict(X.values)[0])
+        raw_pred = float(model.predict(X_arr)[0])
         if log_transform:
             raw_pred = float(np.expm1(raw_pred))
         predicted = round(raw_pred, 2)

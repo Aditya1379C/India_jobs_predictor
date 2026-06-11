@@ -126,6 +126,7 @@ def _run_pipeline() -> None:
         )
 
         # Stream log lines as status updates
+        assert proc.stdout is not None   # guaranteed by stdout=PIPE above
         for line in proc.stdout:
             line = line.strip()
             if not line:
