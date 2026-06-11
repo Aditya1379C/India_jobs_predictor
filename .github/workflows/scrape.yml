@@ -16,9 +16,9 @@
 name: daily-scrape
 
 on:
+  workflow_dispatch:      # allow manual runs from the Actions tab
   schedule:
     - cron: "30 5 * * *"
-  workflow_dispatch: {}   # allow manual runs from the Actions tab
 
 permissions:
   contents: write
