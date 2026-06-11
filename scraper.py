@@ -59,8 +59,12 @@ OUTPUT_PATH = str(_HERE / "data" / "scraped_jobs.csv")
 
 CSV_HEADERS = [
     "job_title", "company", "location", "experience",
-    "salary", "skills", "date_posted",
+    "salary", "skills", "date_posted", "description",
 ]
+
+# Keep stored descriptions to a sane size — enough for skill/salary
+# re-extraction without bloating the CSV/DB.
+MAX_DESCRIPTION_CHARS = 2000
 
 # ── Keywords & cities ─────────────────────────────────────────────────────────
 
@@ -184,6 +188,57 @@ def _to_lpa(amount: float, currency: str = "INR", period: str = "YEAR") -> str:
     return f"{lpa:.1f} LPA"
 
 
+# Salary mentions inside free-text descriptions.  Deliberately conservative —
+# only matches amounts with an explicit LPA/lakh unit or an annual/monthly
+# rupee figure, so random numbers ("5 days a week") are never read as salary.
+_SAL_LPA_RANGE_RE = re.compile(
+    r"(?:₹|rs\.?\s*)?(\d{1,3}(?:\.\d+)?)\s*(?:-|–|to)\s*(?:₹|rs\.?\s*)?"
+    r"(\d{1,3}(?:\.\d+)?)\s*(?:lpa|lakhs?|lacs?)\b", re.IGNORECASE)
+_SAL_LPA_SINGLE_RE = re.compile(
+    r"(?:₹|rs\.?\s*)?(\d{1,3}(?:\.\d+)?)\s*(?:lpa|lakhs?|lacs?)\b", re.IGNORECASE)
+_SAL_INR_RE = re.compile(
+    r"(?:₹|rs\.?)\s*([\d,]{5,12})(?:\s*(?:-|–|to)\s*(?:₹|rs\.?)?\s*([\d,]{5,12}))?",
+    re.IGNORECASE)
+_SAL_MONTHLY_RE = re.compile(r"per\s*month|/\s*month|monthly|p\.?m\.?\b", re.IGNORECASE)
+
+
+def _salary_from_text(text: str) -> str:
+    """
+    Fallback: mine a salary figure from a job description when the API
+    returned no structured salary.  Descriptions often contain
+    "CTC 12-15 LPA" or "₹8,00,000 per annum".  Returns '₹X.X LPA' format
+    string or 'Not Mentioned'.
+    """
+    if not text:
+        return "Not Mentioned"
+
+    def _clamp(lpa: float) -> str:
+        return f"{lpa:.1f} LPA" if 0.5 <= lpa <= 200 else "Not Mentioned"
+
+    m = _SAL_LPA_RANGE_RE.search(text)
+    if m:
+        return _clamp((float(m.group(1)) + float(m.group(2))) / 2)
+
+    m = _SAL_LPA_SINGLE_RE.search(text)
+    if m:
+        return _clamp(float(m.group(1)))
+
+    m = _SAL_INR_RE.search(text)
+    if m:
+        lo = float(m.group(1).replace(",", ""))
+        hi = float(m.group(2).replace(",", "")) if m.group(2) else lo
+        avg = (lo + hi) / 2
+        if avg < 1000:          # too small to be a rupee salary
+            return "Not Mentioned"
+        # Annualise monthly figures ("₹50,000 per month")
+        window = text[max(0, m.start() - 20): m.end() + 30]
+        if _SAL_MONTHLY_RE.search(window):
+            avg *= 12
+        return _clamp(avg / 100_000)
+
+    return "Not Mentioned"
+
+
 def _extract_skills_from_text(text: str) -> str:
     """Scan free text for known tech skill keywords (whole-word matches only)."""
     if not text:
@@ -238,6 +293,10 @@ def _adzuna_fetch(keyword: str, city: str, page: int = 1, results_per_page: int 
         description = item.get("description", "")
         skills      = _extract_skills_from_text(description)
 
+        # Fallback: mine the description when no structured salary was given
+        if salary == "Not Mentioned":
+            salary = _salary_from_text(description)
+
         created_raw = item.get("created", "")
         try:
             date_posted = datetime.fromisoformat(
@@ -261,6 +320,7 @@ def _adzuna_fetch(keyword: str, city: str, page: int = 1, results_per_page: int 
             "salary":      salary,
             "skills":      skills,
             "date_posted": date_posted,
+            "description": description[:MAX_DESCRIPTION_CHARS],
         })
 
     return jobs
@@ -353,13 +413,18 @@ def _jsearch_fetch(keyword: str, city: str, page: int = 1) -> list[dict] | None:
         avg_sal    = (sal_min + sal_max) / 2 if (sal_min or sal_max) else 0
         salary     = _to_lpa(avg_sal, currency=currency, period=period)
 
+        desc = item.get("job_description", "")
+
         # Skills — structured list when available, else extract from description
         skills_list = item.get("job_required_skills") or []
         if skills_list:
             skills = ", ".join(skills_list)
         else:
-            desc   = item.get("job_description", "")
             skills = _extract_skills_from_text(desc)
+
+        # Fallback: mine the description when no structured salary was given
+        if salary == "Not Mentioned":
+            salary = _salary_from_text(desc)
 
         # Experience — JSearch provides required_experience_in_months
         exp_obj     = item.get("job_required_experience") or {}
@@ -393,6 +458,7 @@ def _jsearch_fetch(keyword: str, city: str, page: int = 1) -> list[dict] | None:
             "salary":      salary,
             "skills":      skills,
             "date_posted": date_posted,
+            "description": desc[:MAX_DESCRIPTION_CHARS],
         })
 
     return jobs
@@ -465,9 +531,11 @@ def scrape(
             existing_jobs.append(job)
             added += 1
 
-    # Write
+    # Write — restval backfills "description" for rows from pre-existing CSVs
+    # that were scraped before the column was added.
     with open(output_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_HEADERS, extrasaction="ignore")
+        writer = csv.DictWriter(f, fieldnames=CSV_HEADERS, extrasaction="ignore",
+                                restval="Not Mentioned")
         writer.writeheader()
         writer.writerows(existing_jobs)
 

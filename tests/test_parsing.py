@@ -12,7 +12,7 @@ import pytest
 # Make the project root importable regardless of where pytest is invoked
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scraper import _to_lpa, _extract_skills_from_text
+from scraper import _to_lpa, _extract_skills_from_text, _salary_from_text
 from data_pipeline import (
     _parse_salary_lpa,
     _parse_experience_years,
@@ -78,6 +78,34 @@ class TestSkillExtraction:
     def test_dedup(self):
         skills = _extract_skills_from_text("Python, python, PYTHON")
         assert skills.split(", ").count("Python") == 1
+
+
+# ── scraper._salary_from_text (description fallback) ─────────────────────────
+
+class TestSalaryFromText:
+    def test_lpa_range(self):
+        assert _salary_from_text("CTC: 12-15 LPA depending on experience") == "13.5 LPA"
+        assert _salary_from_text("Package of 8 to 10 lakhs per annum") == "9.0 LPA"
+
+    def test_lpa_single(self):
+        assert _salary_from_text("We offer up to 18 LPA") == "18.0 LPA"
+        assert _salary_from_text("Salary: 6.5 lacs") == "6.5 LPA"
+
+    def test_rupee_annual(self):
+        assert _salary_from_text("Salary ₹8,00,000 per annum") == "8.0 LPA"
+        assert _salary_from_text("Rs. 5,00,000 - 7,00,000 yearly") == "6.0 LPA"
+
+    def test_rupee_monthly_annualised(self):
+        assert _salary_from_text("Stipend ₹50,000 per month") == "6.0 LPA"
+
+    def test_no_false_positives(self):
+        assert _salary_from_text("5 days a week, 3 rounds of interviews") == "Not Mentioned"
+        assert _salary_from_text("Join our team of 200 engineers") == "Not Mentioned"
+        assert _salary_from_text("") == "Not Mentioned"
+        assert _salary_from_text(None) == "Not Mentioned"
+
+    def test_implausible_clamped(self):
+        assert _salary_from_text("worth 900 lakhs in funding") == "Not Mentioned"
 
 
 # ── data_pipeline._parse_salary_lpa ───────────────────────────────────────────
