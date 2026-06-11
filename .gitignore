@@ -1,0 +1,24 @@
+# Environment — never commit real API keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Data & models (large / generated)
+data/jobs.db
+models/*.pkl
+models/*.json
+report/
+
+# Logs
+logs/
+*.log
+
+# macOS
+.DS_Store

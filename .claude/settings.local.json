@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(kill -0 80565)",
+      "Bash(ps -p 80561 -o etime=)",
+      "Bash(echo \"Running for: $\\(ps -p 80561 -o etime= 2>/dev/null\\)\")",
+      "Bash(mkdir -p /Users/adityajaisingh/Claude/Projects/PYthon/india_jobs_predictor/logs && wc -l data/scraped_jobs.csv 2>/dev/null || echo \"CSV not found\")",
+      "Bash(pip install *)"
+    ]
+  }
+}
