@@ -24,6 +24,7 @@ The scheduler (`scheduler.py`) runs this entire chain automatically — daily at
 
 ```
 india_jobs_predictor/
+├── .github/workflows/      # Daily cloud scrape + CI test runs
 ├── data/                   # Raw CSV + SQLite database (auto-created)
 ├── models/                 # Trained model, encoders, metrics (auto-created)
 ├── report/                 # Generated HTML dashboard (auto-created)
@@ -36,6 +37,7 @@ india_jobs_predictor/
 ├── scheduler.py            # Auto-runner (daily by default)
 ├── server.py               # Local Flask dashboard server
 ├── tests/                  # Unit tests for parsing & feature logic
+├── setup_launchd.sh        # One-command macOS daily-run installer
 ├── .env.example            # API key template — copy to .env
 └── README.md
 ```
@@ -47,7 +49,7 @@ india_jobs_predictor/
 ### 1. Install dependencies
 
 ```bash
-pip install pandas scikit-learn xgboost requests python-dotenv schedule typer rich
+pip install -r requirements.txt
 ```
 
 ### 2. Configure API keys
@@ -92,13 +94,13 @@ python predict.py train
 
 Output:
 ```
-Best model : RandomForest
-Test MAE   : ₹2.1 LPA
-R²         : 0.71
-Samples    : 3,842
+Best model : Random Forest
+Test MAE   : ₹4.05 LPA
+R²         : 0.315
+Samples    : 3,573
 ```
 
-Compares Random Forest and XGBoost via 5-fold cross-validation and saves the winner to `models/`.
+Compares Random Forest and XGBoost via 5-fold cross-validation and saves the winner to `models/`. Metrics are honest held-out test scores — target encoders and outlier fences are fit on the training split only, so there's no leakage inflating the numbers (an earlier version scored a flattering but fake R² of 0.88 before the leakage was fixed).
 
 ### Generate the dashboard
 
@@ -131,13 +133,39 @@ Output:
 python scheduler.py --now
 ```
 
-### Schedule auto-runs
+### Run the tests
 
+```bash
+make test        # or: python -m pytest tests/ -v
+```
+
+47 unit tests cover the fragile parsing logic: salary strings, experience ranges, skill extraction, title normalization, keyword rotation, and the API call budget.
+
+---
+
+## Automation
+
+Three ways to keep the data accumulating, from simplest to most robust:
+
+**1. Long-running scheduler** (terminal stays open):
 ```bash
 python scheduler.py                          # every day at 11:00
 python scheduler.py --day friday --time 08:30
-nohup python scheduler.py > logs/scheduler.log 2>&1 &   # background
 ```
+
+**2. launchd (macOS)** — runs daily even if you forgot to start anything; missed runs fire on wake:
+```bash
+bash setup_launchd.sh        # run with your venv active
+```
+
+**3. GitHub Actions (recommended)** — `.github/workflows/scrape.yml` scrapes daily at 11:00 IST on GitHub's servers and commits the updated CSV back to the repo. Your machine can be off entirely. Requires `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` as repo secrets. Pull and retrain whenever you like:
+```bash
+git pull
+python predict.py pipeline --csv data/scraped_jobs.csv
+python predict.py train
+```
+
+CI (`.github/workflows/ci.yml`) runs the test suite on every push.
 
 ---
 
@@ -170,10 +198,10 @@ nohup python scheduler.py > logs/scheduler.log 2>&1 &   # background
 
 ## Skills Demonstrated
 
-- API integration and data collection pipeline
-- Data cleaning, feature engineering, salary/experience parsing
+- API integration with retry/backoff, call budgeting, and keyword rotation within a free-tier quota
+- Data cleaning, feature engineering, salary/experience parsing (unit-tested)
 - Machine learning: model selection, cross-validation, log-target regression
 - Leakage-safe target encoding for high-cardinality categoricals (split-first, fit on train only)
-- Automated scheduler + local Flask dashboard server
+- Automation: GitHub Actions cloud scraping + CI, launchd scheduling, local Flask dashboard server
 - Interactive HTML dashboard with dark mode, Chart.js, CSS custom properties
 - CLI tool design with typer
