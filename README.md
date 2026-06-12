@@ -76,7 +76,7 @@ python predict.py scrape
 python predict.py scrape --pages 5          # more pages per keyword
 ```
 
-Fetches listings for 18 default keywords × 6 India cities and appends new results to `data/scraped_jobs.csv`.
+Fetches listings for a rotating daily batch of keywords (10/day from a 36-keyword pool, full coverage every 4 days) × 10 India cities, plus a broad `it-jobs` category sweep — all within Adzuna's 250-calls/day free tier. New results append to `data/scraped_jobs.csv`. Pass `--keywords "a,b,c"` to override the rotation.
 
 ### Load from an existing CSV
 

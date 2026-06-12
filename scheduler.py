@@ -62,10 +62,10 @@ def run_pipeline() -> None:
     # ── Step 1: Scrape ────────────────────────────────────────────────────────
     log.info("[1/4] Scraping new jobs via API...")
     try:
-        from scraper import scrape, DEFAULT_KEYWORDS, OUTPUT_PATH
+        from scraper import scrape, OUTPUT_PATH
         output_path = scrape(
-            keywords=DEFAULT_KEYWORDS,
-            pages_per_keyword=2,        # 18 keywords × 6 cities × 2 pages = 216 calls/day (within free tier)
+            keywords=None,              # daily rotation batch: 10 kw × 10 cities × 2 pages
+            pages_per_keyword=2,        # + category sweep = ~220 calls (within 250/day free tier)
             output_path=OUTPUT_PATH,
             delay=2.0,                  # be polite — slightly longer delay
         )

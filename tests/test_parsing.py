@@ -12,7 +12,17 @@ import pytest
 # Make the project root importable regardless of where pytest is invoked
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scraper import _to_lpa, _extract_skills_from_text, _salary_from_text
+from scraper import (
+    _to_lpa,
+    _extract_skills_from_text,
+    _salary_from_text,
+    _get_json,
+    _CALLS,
+    rotation_batch,
+    KEYWORD_POOL,
+    KEYWORDS_PER_DAY,
+    MAX_CALLS_PER_RUN,
+)
 from data_pipeline import (
     _parse_salary_lpa,
     _parse_experience_years,
@@ -106,6 +116,46 @@ class TestSalaryFromText:
 
     def test_implausible_clamped(self):
         assert _salary_from_text("worth 900 lakhs in funding") == "Not Mentioned"
+
+
+# ── scraper.rotation_batch + call budget ─────────────────────────────────────
+
+class TestRotationBatch:
+    def test_deterministic_for_same_day(self):
+        from datetime import datetime
+        d = datetime(2026, 6, 12)
+        assert rotation_batch(when=d) == rotation_batch(when=d)
+
+    def test_batch_size(self):
+        from datetime import datetime
+        batch = rotation_batch(when=datetime(2026, 6, 12))
+        assert 0 < len(batch) <= KEYWORDS_PER_DAY
+
+    def test_full_pool_covered_across_cycle(self):
+        from datetime import datetime, timedelta
+        n_batches = -(-len(KEYWORD_POOL) // KEYWORDS_PER_DAY)
+        seen = set()
+        for offset in range(n_batches):
+            seen.update(rotation_batch(when=datetime(2026, 6, 1) + timedelta(days=offset)))
+        assert seen == set(KEYWORD_POOL)
+
+    def test_batches_disjoint_on_consecutive_days(self):
+        from datetime import datetime, timedelta
+        d = datetime(2026, 6, 12)
+        b1 = set(rotation_batch(when=d))
+        b2 = set(rotation_batch(when=d + timedelta(days=1)))
+        assert b1.isdisjoint(b2)
+
+
+class TestCallBudget:
+    def test_budget_exhaustion_blocks_requests(self):
+        saved = _CALLS["n"]
+        try:
+            _CALLS["n"] = MAX_CALLS_PER_RUN
+            # Must return None without attempting any network I/O
+            assert _get_json("https://example.invalid", params={}, label="test") is None
+        finally:
+            _CALLS["n"] = saved
 
 
 # ── data_pipeline._parse_salary_lpa ───────────────────────────────────────────

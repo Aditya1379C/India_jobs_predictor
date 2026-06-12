@@ -89,6 +89,50 @@ DEFAULT_KEYWORDS = [
     "ETL developer",
 ]
 
+# Extended pool — rotated in daily batches so total coverage grows without
+# blowing the 250-calls/day Adzuna budget.  DEFAULT_KEYWORDS kept intact for
+# explicit --keywords runs and backward compatibility.
+KEYWORD_POOL = DEFAULT_KEYWORDS + [
+    "frontend developer",
+    "react developer",
+    "java developer",
+    "android developer",
+    "ios developer",
+    "mobile developer",
+    "QA engineer",
+    "test automation engineer",
+    "site reliability engineer",
+    "platform engineer",
+    "security engineer",
+    "cybersecurity analyst",
+    "database administrator",
+    "data architect",
+    "big data engineer",
+    "computer vision engineer",
+    "research engineer",
+    "technical product manager",
+]
+
+KEYWORDS_PER_DAY = 10   # rotation batch size (pool of 36 → 4 batches → full cycle every 4 days)
+
+
+def rotation_batch(pool: list[str] | None = None,
+                   size: int = KEYWORDS_PER_DAY,
+                   when: datetime | None = None) -> list[str]:
+    """
+    Deterministic daily slice of the keyword pool.
+
+    Day-of-year selects the batch, so consecutive days cover different
+    keywords and the full pool is swept every ceil(len(pool)/size) days.
+    Same-day re-runs get the same batch (idempotent with CSV dedup).
+    """
+    pool = pool if pool is not None else KEYWORD_POOL
+    day = (when or datetime.now(timezone.utc)).timetuple().tm_yday
+    n_batches = -(-len(pool) // size)   # ceil division
+    i = day % n_batches
+    return pool[i * size:(i + 1) * size]
+
+
 INDIA_CITIES = [
     "Bangalore",
     "Mumbai",
@@ -96,6 +140,10 @@ INDIA_CITIES = [
     "Delhi",
     "Pune",
     "Chennai",
+    "Noida",
+    "Gurgaon",
+    "Ahmedabad",
+    "Kolkata",
 ]
 
 # Tech skills to detect in job descriptions (Adzuna doesn't return structured skills)
@@ -130,15 +178,25 @@ _SESSION = requests.Session()   # connection re-use across hundreds of calls
 MAX_RETRIES   = 3
 BACKOFF_BASE  = 2.0   # seconds: 2, 4, 8
 
+# Hard per-run call budget — keeps any config mistake from blowing the
+# Adzuna free tier (250/day).  Each HTTP attempt (incl. retries) counts.
+MAX_CALLS_PER_RUN = int(os.getenv("MAX_CALLS_PER_RUN", "240"))
+_CALLS = {"n": 0}
+
 
 def _get_json(url: str, *, params: dict, headers: dict | None = None,
               label: str = "API") -> dict | None:
     """
     GET a JSON endpoint with retry + exponential backoff.
-    Returns the parsed dict, or None after MAX_RETRIES failures.
+    Returns the parsed dict, or None after MAX_RETRIES failures
+    or when the per-run call budget is exhausted.
     4xx client errors (bad key, rate limit exhausted) are not retried.
     """
     for attempt in range(1, MAX_RETRIES + 1):
+        if _CALLS["n"] >= MAX_CALLS_PER_RUN:
+            print(f"  [!] {label}: call budget ({MAX_CALLS_PER_RUN}) exhausted — stopping")
+            return None
+        _CALLS["n"] += 1
         try:
             r = _SESSION.get(url, params=params, headers=headers, timeout=15)
             r.raise_for_status()
@@ -252,9 +310,14 @@ def _extract_skills_from_text(text: str) -> str:
 
 # ── Adzuna source ─────────────────────────────────────────────────────────────
 
-def _adzuna_fetch(keyword: str, city: str, page: int = 1, results_per_page: int = 50) -> list[dict] | None:
+def _adzuna_fetch(keyword: str | None, city: str, page: int = 1,
+                  results_per_page: int = 50,
+                  category: str | None = None) -> list[dict] | None:
     """
-    Fetch one page of Adzuna results for a keyword + city.
+    Fetch one page of Adzuna results for a keyword + city, or — when
+    `category` is given instead of a keyword — a broad category sweep
+    (e.g. "it-jobs") that catches titles the keyword list misses.
+
     Salary returned as min/max annual INR → normalised to LPA.
     Skills extracted from description text.
 
@@ -271,10 +334,13 @@ def _adzuna_fetch(keyword: str, city: str, page: int = 1, results_per_page: int 
         "app_id":          ADZUNA_APP_ID,
         "app_key":         ADZUNA_APP_KEY,
         "results_per_page": results_per_page,
-        "what":            keyword,
         "where":           city,
         "content-type":    "application/json",
     }
+    if keyword:
+        params["what"] = keyword
+    if category:
+        params["category"] = category
 
     data = _get_json(url, params=params, label="Adzuna")
     if data is None:
@@ -370,9 +436,23 @@ def _scrape_loop(
     return all_jobs
 
 
+# Broad category swept once per city per run — catches job titles that no
+# keyword matches.  Disable with ADZUNA_CATEGORY_SWEEP=false in .env.
+ADZUNA_SWEEP_CATEGORY = "it-jobs"
+ADZUNA_CATEGORY_SWEEP = os.getenv("ADZUNA_CATEGORY_SWEEP", "true").lower() != "false"
+
+
 def scrape_adzuna(keywords: list[str], pages_per_keyword: int, delay: float) -> list[dict]:
-    """Iterate keywords × cities × pages and collect all Adzuna results."""
-    return _scrape_loop(_adzuna_fetch, "Adzuna", keywords, pages_per_keyword, delay)
+    """Iterate keywords × cities × pages, plus a broad it-jobs category sweep."""
+    jobs = _scrape_loop(_adzuna_fetch, "Adzuna", keywords, pages_per_keyword, delay)
+
+    if ADZUNA_CATEGORY_SWEEP:
+        def _sweep(_kw, city, page):
+            return _adzuna_fetch(None, city, page=page, category=ADZUNA_SWEEP_CATEGORY)
+        jobs += _scrape_loop(_sweep, f"Adzuna category={ADZUNA_SWEEP_CATEGORY}",
+                             [f"[{ADZUNA_SWEEP_CATEGORY}]"], pages_per_keyword, delay)
+
+    return jobs
 
 
 # ── JSearch source ────────────────────────────────────────────────────────────
@@ -482,14 +562,18 @@ def scrape(
     Fetch India tech jobs via API and append new results to the CSV.
 
     Args:
-        keywords:           Job search terms (defaults to DEFAULT_KEYWORDS)
+        keywords:           Job search terms.  Defaults to today's rotation
+                            batch from KEYWORD_POOL (10 keywords/day, full
+                            36-keyword pool covered every 4 days) — keeps
+                            daily calls within the Adzuna free tier.
         pages_per_keyword:  API pages per keyword/city pair
         output_path:        CSV file to write
         delay:              Seconds between API calls
         source:             "adzuna" or "jsearch" (overrides .env API_SOURCE)
     """
     if keywords is None:
-        keywords = DEFAULT_KEYWORDS
+        keywords = rotation_batch()
+        print(f"[→] Keyword rotation: today's batch of {len(keywords)} from pool of {len(KEYWORD_POOL)}")
 
     api = (source or API_SOURCE).lower()
 
