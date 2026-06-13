@@ -32,7 +32,7 @@ def salary(
     """Predict salary for a given role, city, and experience."""
     from model import predict
 
-    console.print(f"\n[bold cyan]Predicting salary for:[/bold cyan]")
+    console.print("\n[bold cyan]Predicting salary for:[/bold cyan]")
     console.print(f"  Role       : [yellow]{role}[/yellow]")
     console.print(f"  City       : [yellow]{city}[/yellow]")
     console.print(f"  Experience : [yellow]{exp} years[/yellow]")
@@ -69,7 +69,7 @@ def scrape(
     from data_pipeline import run_with_scraper
 
     kw_list = [k.strip() for k in keywords.split(",") if k.strip()] if keywords else None
-    console.print(f"\n[bold cyan]Scraping job listings...[/bold cyan]")
+    console.print("\n[bold cyan]Scraping job listings...[/bold cyan]")
     if kw_list:
         console.print(f"  Keywords : [yellow]{', '.join(kw_list)}[/yellow]")
     console.print(f"  Pages    : [yellow]{pages} per keyword[/yellow]\n")
@@ -116,7 +116,8 @@ def serve(
     host: str  = typer.Option("127.0.0.1", "--host", help="Host address (default: 127.0.0.1)"),
 ):
     """Start the local web dashboard (http://127.0.0.1:8080 by default)."""
-    import subprocess, sys
+    import subprocess
+    import sys
     console.print(f"\n[bold cyan]Starting dashboard on http://{host}:{port}[/bold cyan]")
     console.print("[dim]Press Ctrl+C to stop.[/dim]\n")
     subprocess.run(
