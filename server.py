@@ -82,7 +82,7 @@ def status():
 
 @app.route("/api/run", methods=["POST"])
 def run():
-    """Trigger the full pipeline (scrape → clean → train → report) in a background thread."""
+    """Trigger the full pipeline (git pull → clean → train → report) in a background thread."""
     with _lock:
         if _state["running"]:
             return jsonify({"ok": False, "message": "Pipeline already running"}), 409
@@ -106,19 +106,19 @@ def _set_step(msg: str) -> None:
 
 def _run_pipeline() -> None:
     """
-    Executes scheduler.py --now as a subprocess and streams its output
+    Executes scheduler.py as a subprocess and streams its output
     back into the step status so the dashboard can poll it.
     """
     start = time.time()
     try:
-        _set_step("[1/4] Scraping new jobs…")
+        _set_step("[1/4] Pulling latest data from GitHub…")
 
-        # Run scheduler.py --now in the same working directory
+        # Run scheduler.py in the same working directory
         cwd = os.path.dirname(os.path.abspath(__file__))
         # -u: unbuffered child stdout — without it Python buffers print() output
         # when not attached to a tty, so status updates lagged until flush.
         proc = subprocess.Popen(
-            [sys.executable, "-u", "scheduler.py", "--now"],
+            [sys.executable, "-u", "scheduler.py"],
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

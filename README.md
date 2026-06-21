@@ -16,7 +16,7 @@ scraper.py  →  data/scraped_jobs.csv
                                             report.py  →  report/dashboard.html
 ```
 
-The scheduler (`scheduler.py`) runs this entire chain automatically — daily at 11:00 by default, configurable with `--day`/`--time`.
+`scheduler.py` runs this entire chain in one shot (git pull → clean → retrain → report). The daily scrape itself runs on GitHub Actions (`.github/workflows/scrape.yml`); run `scheduler.py` locally whenever you want to pull the latest data and retrain.
 
 ---
 
@@ -24,7 +24,7 @@ The scheduler (`scheduler.py`) runs this entire chain automatically — daily at
 
 ```
 india_jobs_predictor/
-├── .github/workflows/      # Daily cloud scrape + CI test runs
+├── .github/workflows/      # Daily cloud scrape + retrain + CI test runs
 ├── data/                   # Raw CSV + SQLite database (auto-created)
 ├── models/                 # Trained model, encoders, metrics (auto-created)
 ├── report/                 # Generated HTML dashboard (auto-created)
@@ -34,10 +34,11 @@ india_jobs_predictor/
 ├── model.py                # Train RF + XGBoost, group-mean target encoding, predict
 ├── predict.py              # CLI entry point
 ├── report.py               # Chart.js HTML dashboard generator
-├── scheduler.py            # Auto-runner (daily by default)
+├── scheduler.py            # One-shot pipeline runner (git pull → clean → retrain → report)
+├── log_run.py              # Appends a metrics summary row to RUN_HISTORY.md
 ├── server.py               # Local Flask dashboard server
 ├── tests/                  # Unit tests for parsing & feature logic
-├── setup_launchd.sh        # One-command macOS daily-run installer
+├── RUN_HISTORY.md          # Auto-logged metrics from each pipeline run
 ├── .env.example            # API key template — copy to .env
 └── README.md
 ```
@@ -130,7 +131,7 @@ Output:
 ### Run the full pipeline once (manual trigger)
 
 ```bash
-python scheduler.py --now
+python scheduler.py
 ```
 
 ### Run the tests
@@ -145,25 +146,19 @@ make test        # or: python -m pytest tests/ -v
 
 ## Automation
 
-Three ways to keep the data accumulating, from simplest to most robust:
+The full pipeline runs entirely on GitHub's servers — your machine can be off:
 
-**1. Long-running scheduler** (terminal stays open):
-```bash
-python scheduler.py                          # every day at 11:00
-python scheduler.py --day friday --time 08:30
-```
+1. **`scrape.yml`** — scrapes daily at 11:00 IST, commits the updated `data/scraped_jobs.csv`. Requires `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` as repo secrets.
+2. **`train.yml`** — triggers automatically once `scrape.yml` completes: cleans the data, retrains the model, regenerates the dashboard, logs a summary row to [`RUN_HISTORY.md`](RUN_HISTORY.md), and commits `report/dashboard.html` + `models/*.pkl` + `models/*.json` back to the repo (force-added despite `.gitignore` — see the note there).
 
-**2. launchd (macOS)** — runs daily even if you forgot to start anything; missed runs fire on wake:
-```bash
-bash setup_launchd.sh        # run with your venv active
-```
-
-**3. GitHub Actions (recommended)** — `.github/workflows/scrape.yml` scrapes daily at 11:00 IST on GitHub's servers and commits the updated CSV back to the repo. Your machine can be off entirely. Requires `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` as repo secrets. Pull and retrain whenever you like:
+So all you need to do is pull and view:
 ```bash
 git pull
-python predict.py pipeline --csv data/scraped_jobs.csv
-python predict.py train
+python server.py        # http://127.0.0.1:8080
 ```
+Check [`RUN_HISTORY.md`](RUN_HISTORY.md) for a quick log of every scrape → retrain → report cycle (total jobs, training samples, model, test MAE, R²) without needing to open the dashboard.
+
+`scheduler.py` still exists for running the same pipeline locally on demand (git pull → clean → retrain → report → log), e.g. if you want to retrain without waiting for the daily cron.
 
 CI (`.github/workflows/ci.yml`) runs the test suite on every push.
 
@@ -190,7 +185,6 @@ CI (`.github/workflows/ci.yml`) runs the test suite on every push.
 | `scikit-learn` | Random Forest, preprocessing, cross-validation |
 | `xgboost` | XGBoost regressor |
 | `requests` + `python-dotenv` | API calls, environment config |
-| `schedule` | Weekly pipeline scheduler |
 | `typer` + `rich` | CLI interface |
 | Chart.js 4 | Interactive dashboard charts (frontend, no install needed) |
 
@@ -202,6 +196,6 @@ CI (`.github/workflows/ci.yml`) runs the test suite on every push.
 - Data cleaning, feature engineering, salary/experience parsing (unit-tested)
 - Machine learning: model selection, cross-validation, log-target regression
 - Leakage-safe target encoding for high-cardinality categoricals (split-first, fit on train only)
-- Automation: GitHub Actions cloud scraping + CI, launchd scheduling, local Flask dashboard server
+- Automation: GitHub Actions cloud scraping + CI, local Flask dashboard server
 - Interactive HTML dashboard with dark mode, Chart.js, CSS custom properties
 - CLI tool design with typer

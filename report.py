@@ -786,7 +786,7 @@ def build_html(stats: dict) -> str:
           <li><strong>Data pipeline:</strong> Raw API response → Pandas → SQLite via a modular ETL pipeline with salary/experience parsing, imputation, and history-preserving upsert.</li>
           <li><strong>ML model:</strong> {model_name} with LOO target encoding, company tier feature (FAANG/MNC/Indian IT/Startup), 5-fold CV, and log-transformed salary target. {r2_str} on test set.</li>
           <li><strong>Salary predictor:</strong> Lookup tables from training data embedded in this HTML. Works fully offline — no server needed for this section.</li>
-          <li><strong>Daily scheduler:</strong> launchd job fires every day at 11 AM to scrape, retrain, and regenerate this dashboard. Run pipeline manually using <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">python server.py</code>.</li>
+          <li><strong>Daily pipeline:</strong> GitHub Actions scrapes at 11 AM IST, then automatically retrains and regenerates this dashboard, committing the results back to the repo. Just <code style="background:var(--bg3);padding:1px 5px;border-radius:4px">git pull</code> to get the latest.</li>
         </ul>
         <div class="method-list">
           <div class="method-pill"><span>🐍</span>Python 3.11</div>
@@ -794,7 +794,7 @@ def build_html(stats: dict) -> str:
           <div class="method-pill"><span>🌐</span>Adzuna API</div>
           <div class="method-pill"><span>🤖</span>{model_name}</div>
           <div class="method-pill"><span>🏢</span>Company tiers</div>
-          <div class="method-pill"><span>⏰</span>launchd daily</div>
+          <div class="method-pill"><span>⏰</span>GitHub Actions daily</div>
         </div>
       </div>
     </div>

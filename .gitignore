@@ -10,7 +10,10 @@ build/
 .venv/
 venv/
 
-# Data & models (large / generated)
+# Data & models (large / generated locally)
+# Note: the daily-retrain GitHub Actions workflow force-adds
+# report/dashboard.html + models/*.pkl + models/*.json (git add -f),
+# so those specific files do get committed despite being listed here.
 data/jobs.db
 models/*.pkl
 models/*.json

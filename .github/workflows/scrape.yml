@@ -4,14 +4,15 @@
 #   1. Scrapes fresh jobs via the Adzuna API (keys from repo secrets)
 #   2. Commits the updated data/scraped_jobs.csv back to the repo
 #
-# It deliberately does NOT train the model or build the DB — those stay
-# local (jobs.db and models/ are gitignored; both are derived from the CSV).
-# To use the accumulated data:  git pull && make pipeline
+# It deliberately does NOT train the model itself — that's handled by the
+# daily-retrain workflow (.github/workflows/train.yml), which triggers
+# automatically once this workflow completes. Just `git pull` afterwards
+# to get the fresh CSV, retrained model, and regenerated dashboard.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   ADZUNA_APP_ID, ADZUNA_APP_KEY
 #
-# 05:30 UTC = 11:00 IST, matching the local schedule.
+# 05:30 UTC = 11:00 IST.
 
 name: daily-scrape
 
