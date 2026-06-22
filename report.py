@@ -298,7 +298,7 @@ def build_html(stats: dict) -> str:
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {{
       --bg:           #f1f5f9;
@@ -342,7 +342,7 @@ def build_html(stats: dict) -> str:
     body {{
       background: var(--bg);
       color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
+      font-family: 'IBM Plex Sans', sans-serif;
       font-size: 15px;
       min-height: 100vh;
       overflow-x: hidden;
@@ -362,16 +362,16 @@ def build_html(stats: dict) -> str:
     /* ─── HEADER ─── */
     .header {{ margin-bottom: 36px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }}
     .header-inner {{ display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 20px; }}
-    .eyebrow {{ font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }}
-    .title {{ font-family: 'JetBrains Mono', monospace; font-size: clamp(24px,3.5vw,42px); font-weight: 400; line-height: 1.05; letter-spacing: 2px; text-transform: uppercase; }}
+    .eyebrow {{ font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; font-weight: 500; }}
+    .title {{ font-family: 'Space Grotesk', sans-serif; font-size: clamp(24px,3.5vw,42px); font-weight: 700; line-height: 1.05; letter-spacing: 2px; text-transform: uppercase; }}
     .title span {{ color: inherit; }}
-    .subtitle {{ color: var(--text2); margin-top: 8px; font-size: 14px; max-width: 520px; line-height: 1.6; }}
+    .subtitle {{ color: var(--text2); margin-top: 8px; font-size: 14px; max-width: 520px; line-height: 1.6; font-weight: 400; }}
     .header-badges {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
     .badge-tag {{ background: var(--card); border: 1px solid var(--border); border-radius: 50px; padding: 5px 13px; font-size: 11px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; }}
 
     /* ─── NAV ─── */
     .section-nav {{ display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }}
-    .nav-btn {{ display: flex; align-items: center; gap: 7px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); cursor: pointer; transition: all 0.2s; letter-spacing: 1px; }}
+    .nav-btn {{ display: flex; align-items: center; gap: 7px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--text2); cursor: pointer; transition: all 0.2s; letter-spacing: 1px; }}
     .nav-btn:hover {{ border-color: color-mix(in srgb,var(--accent) 40%,transparent); color: var(--text); }}
     .nav-btn.active {{ background: color-mix(in srgb,var(--accent) 12%,transparent); border-color: var(--accent); color: var(--accent); }}
     .nav-btn .nav-num {{ background: color-mix(in srgb,var(--accent) 15%,transparent); color: var(--accent); border-radius: 4px; padding: 1px 5px; font-size: 11px; }}
@@ -383,9 +383,9 @@ def build_html(stats: dict) -> str:
     .kpi:hover {{ transform: translateY(-3px); border-color: rgba(37,99,235,0.3); box-shadow: 0 8px 32px rgba(0,0,0,0.08); }}
     .kpi::before {{ content:''; position:absolute; top:0; left:0; right:0; height:2px; background: var(--kpi-color, var(--accent)); }}
     .kpi-icon {{ font-size: 22px; margin-bottom: 12px; display: block; }}
-    .kpi-val {{ font-family: 'JetBrains Mono', monospace; font-size: 32px; font-weight: 700; color: var(--kpi-color, var(--accent)); line-height: 1; margin-bottom: 5px; letter-spacing: 1px; }}
-    .kpi-label {{ color: var(--text2); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; }}
-    .kpi-sub {{ color: var(--text3); font-size: 12px; margin-top: 7px; line-height: 1.5; }}
+    .kpi-val {{ font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: var(--kpi-color, var(--accent)); line-height: 1; margin-bottom: 5px; letter-spacing: 1px; }}
+    .kpi-label {{ font-family: 'Space Grotesk', sans-serif; color: var(--text2); font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 500; }}
+    .kpi-sub {{ color: var(--text3); font-size: 12px; margin-top: 7px; line-height: 1.5; font-weight: 400; }}
 
     /* ─── SECTIONS ─── */
     .section {{ display: none; }}
@@ -400,26 +400,26 @@ def build_html(stats: dict) -> str:
     .card {{ background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 26px; position: relative; overflow: hidden; transition: border-color 0.2s; }}
     .card:hover {{ border-color: rgba(37,99,235,0.2); }}
     .card-header {{ margin-bottom: 18px; }}
-    .card-title {{ font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 400; color: var(--text); text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 4px; }}
-    .card-sub {{ color: var(--text3); font-size: 12px; letter-spacing: 0.5px; line-height: 1.5; }}
+    .card-title {{ font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 4px; }}
+    .card-sub {{ color: var(--text3); font-size: 12px; letter-spacing: 0.5px; line-height: 1.5; font-weight: 400; }}
     canvas {{ max-height: 320px; }}
 
     /* ─── FILTER BAR ─── */
     .filter-bar {{ display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }}
-    .filter-bar label {{ font-size: 12px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; }}
+    .filter-bar label {{ font-size: 12px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; font-weight: 500; }}
     .filter-select {{
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-      padding: 7px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text);
+      padding: 7px 12px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: var(--text);
       cursor: pointer; outline: none; transition: border-color 0.2s;
     }}
     .filter-select:focus {{ border-color: var(--accent); }}
-    .filter-reset {{ background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text2); cursor: pointer; transition: all 0.2s; }}
+    .filter-reset {{ background: none; border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; color: var(--text2); cursor: pointer; transition: all 0.2s; }}
     .filter-reset:hover {{ border-color: var(--accent); color: var(--accent); }}
 
     /* ─── SECTION HEADING ─── */
     .section-heading {{ display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }}
-    .section-heading-num {{ font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 400; color: var(--accent); background: color-mix(in srgb,var(--accent) 10%,transparent); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 6px; padding: 4px 10px; letter-spacing: 2px; }}
-    .section-heading-title {{ font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; }}
+    .section-heading-num {{ font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: var(--accent); background: color-mix(in srgb,var(--accent) 10%,transparent); border: 1px solid color-mix(in srgb,var(--accent) 25%,transparent); border-radius: 6px; padding: 4px 10px; letter-spacing: 2px; }}
+    .section-heading-title {{ font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }}
     .section-heading-line {{ flex: 1; height: 1px; background: var(--border); }}
 
     /* ─── SALARY BARS ─── */
@@ -428,7 +428,7 @@ def build_html(stats: dict) -> str:
     .salary-bar-wrap {{ flex: 1; position: relative; height: 18px; }}
     .salary-bar-bg {{ width: 100%; height: 6px; background: var(--bg3); border-radius: 3px; position: absolute; top: 50%; transform: translateY(-50%); }}
     .salary-bar-fill {{ height: 100%; border-radius: 3px; transition: width 0.6s; }}
-    .salary-val {{ width: 56px; text-align: right; color: var(--text); font-size: 13px; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-weight: 500; }}
+    .salary-val {{ width: 56px; text-align: right; color: var(--text); font-size: 13px; flex-shrink: 0; font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; }}
 
     /* ─── INSIGHT LIST ─── */
     .insight-list {{ list-style: none; padding: 0; }}
@@ -449,12 +449,12 @@ def build_html(stats: dict) -> str:
     .pred-field label {{ display: block; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text2); margin-bottom: 7px; }}
     .pred-select, .pred-input {{
       width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-      padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text);
+      padding: 10px 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--text);
       outline: none; transition: border-color 0.2s;
     }}
     .pred-select:focus, .pred-input:focus {{ border-color: var(--accent); }}
     .pred-exp-row {{ display: flex; align-items: center; gap: 12px; }}
-    .pred-exp-val {{ font-family: 'JetBrains Mono', monospace; font-weight: 400; font-size: 18px; color: var(--accent); min-width: 36px; letter-spacing: 1px; }}
+    .pred-exp-val {{ font-family: 'IBM Plex Sans', sans-serif; font-weight: 700; font-size: 18px; color: var(--accent); min-width: 36px; letter-spacing: 1px; }}
     input[type=range] {{ flex: 1; accent-color: var(--accent); cursor: pointer; }}
     .skills-grid {{ display: flex; flex-wrap: wrap; gap: 8px; }}
     .skill-label {{ display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; color: var(--text2); transition: all 0.15s; user-select: none; }}
@@ -463,21 +463,21 @@ def build_html(stats: dict) -> str:
     .skill-label:has(input:checked) {{ background: rgba(37,99,235,0.08); border-color: var(--accent); color: var(--accent); }}
     .pred-btn {{
       background: var(--accent); color: #fff; border: none; border-radius: 10px;
-      padding: 13px 24px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 400;
+      padding: 13px 24px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 700;
       cursor: pointer; letter-spacing: 2px; text-transform: uppercase; transition: background 0.2s, transform 0.1s;
     }}
     .pred-btn:hover {{ background: var(--accent-hover); }}
     .pred-btn:active {{ transform: scale(0.98); }}
     .pred-result {{ background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center; min-height: 200px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; }}
     .pred-result-empty {{ color: var(--text3); font-size: 14px; }}
-    .pred-result-val {{ font-family: 'JetBrains Mono', monospace; font-size: 48px; font-weight: 700; color: var(--accent3); line-height: 1; letter-spacing: 2px; }}
+    .pred-result-val {{ font-family: 'Space Grotesk', sans-serif; font-size: 48px; font-weight: 700; color: var(--accent3); line-height: 1; letter-spacing: 2px; }}
     .pred-result-unit {{ font-size: 14px; color: var(--text2); letter-spacing: 2px; text-transform: uppercase; }}
     .pred-result-range {{ font-size: 14px; color: var(--text2); margin-top: 4px; }}
     .pred-result-range span {{ color: var(--text); font-weight: 600; }}
     .pred-result-breakdown {{ margin-top: 16px; width: 100%; }}
     .pred-breakdown-row {{ display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2); }}
     .pred-breakdown-row:last-child {{ border-bottom: none; }}
-    .pred-breakdown-row span:last-child {{ color: var(--text); font-family: 'JetBrains Mono', monospace; font-weight: 400; letter-spacing: 0.5px; }}
+    .pred-breakdown-row span:last-child {{ color: var(--text); font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; letter-spacing: 0.5px; }}
     .pred-note {{ font-size: 12px; color: var(--text3); margin-top: 12px; line-height: 1.5; }}
     .pred-model-badge {{ background: color-mix(in srgb,var(--accent) 8%,transparent); border: 1px solid color-mix(in srgb,var(--accent) 20%,transparent); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--accent); letter-spacing: 0.5px; }}
 
@@ -491,7 +491,7 @@ def build_html(stats: dict) -> str:
       position: fixed; top: 20px; right: 24px; z-index: 999;
       display: flex; align-items: center; gap: 7px;
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-      padding: 8px 14px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      padding: 8px 14px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px;
       color: var(--text2); cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     }}
@@ -501,7 +501,7 @@ def build_html(stats: dict) -> str:
     .run-btn {{
       display: inline-flex; align-items: center; gap: 8px;
       background: var(--card); border: 1px solid var(--border); border-radius: 8px;
-      padding: 9px 16px; font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      padding: 9px 16px; font-family: 'IBM Plex Sans', sans-serif; font-size: 13px;
       color: var(--text2); cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
     }}
     .run-btn:hover:not(:disabled) {{ border-color: var(--accent3); color: var(--accent3); }}
@@ -830,7 +830,7 @@ def build_html(stats: dict) -> str:
             </select>
           </div>
           <div class="pred-field">
-            <label>Years of Experience &nbsp; <span id="exp-display" style="color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:1px">0</span> yrs</label>
+            <label>Years of Experience &nbsp; <span id="exp-display" style="color:var(--accent);font-family:'IBM Plex Mono', monospace;letter-spacing:1px">0</span> yrs</label>
             <input type="range" id="pred-exp" min="0" max="15" step="0.5" value="0"
                    oninput="document.getElementById('exp-display').textContent=this.value">
           </div>
@@ -882,8 +882,8 @@ function showSection(id, btn) {{
 const _initDark = (localStorage.getItem('theme') === 'dark');
 let GRID  = _initDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)';
 let TICKS = _initDark ? '#94a3b8' : '#64748b';
-const FONT = {{ family: 'JetBrains Mono', size: 12 }};
-const AXIS_TITLE_FONT = {{ family: 'JetBrains Mono', size: 13 }};
+const FONT = {{ family: 'IBM Plex Sans', size: 12 }};
+const AXIS_TITLE_FONT = {{ family: 'Space Grotesk', size: 13 }};
 let TIP  = _initDark
   ? {{ backgroundColor:'#1e293b', titleColor:'#f1f5f9', bodyColor:'#94a3b8', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, padding:10 }}
   : {{ backgroundColor:'#fff',    titleColor:'#0f172a', bodyColor:'#475569',  borderColor:'rgba(15,23,42,0.12)',    borderWidth:1, padding:10 }};
