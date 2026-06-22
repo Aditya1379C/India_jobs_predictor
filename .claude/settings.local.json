@@ -12,7 +12,10 @@
       "Bash(git -C /Users/adityajaisingh/Claude/Projects/PYthon/india_jobs_predictor log --oneline -1 -- data/scraped_jobs.csv)",
       "Bash(git -C /Users/adityajaisingh/Claude/Projects/PYthon/india_jobs_predictor status --short data/)",
       "Bash(gh workflow *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(git fetch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
