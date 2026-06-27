@@ -1,6 +1,6 @@
-# India Tech Jobs — Salary Predictor
+# India Tech Jobs - Salary Predictor
 
-An end-to-end Python data pipeline that scrapes India tech job listings via public APIs, cleans and stores them in SQLite, trains a salary prediction model (Random Forest + XGBoost), and serves an interactive HTML dashboard — fully automated on GitHub Actions and runnable from a single CLI.
+An end-to-end Python data pipeline that scrapes India tech job listings via public APIs, cleans and stores them in SQLite, trains a salary prediction model (Random Forest + XGBoost), and serves an interactive HTML dashboard - fully automated on GitHub Actions and runnable from a single CLI.
 
 > **Current model:** XGBoost · MAE ₹4.21 LPA · R² 0.243 · 3,263 training samples
 
@@ -14,7 +14,7 @@ An end-to-end Python data pipeline that scrapes India tech job listings via publ
 
 ## What Makes This Different
 
-Most salary data projects work off a static Kaggle CSV. This one pulls **live data** from real job APIs every day, processes it through a production-style engineering pipeline, trains a model with proper ML hygiene, and deploys a dashboard — the same workflow you'd build at a company.
+Most salary data projects work off a static Kaggle CSV. This one pulls **live data** from real job APIs every day, processes it through a production-style engineering pipeline, trains a model with proper ML hygiene, and deploys a dashboard - the same workflow you'd build at a company.
 
 ---
 
@@ -62,7 +62,7 @@ india_jobs_predictor/
 ├── log_run.py              # Appends metrics row to RUN_HISTORY.md after each run
 ├── RUN_HISTORY.md          # Auto-logged history of every scrape → retrain → report cycle
 ├── Makefile                # Common task shortcuts
-└── .env.example            # API key template — copy to .env
+└── .env.example            # API key template - copy to .env
 ```
 
 ---
@@ -81,7 +81,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Two free API options — pick one:
+Two free API options - pick one:
 
 | API | Free tier | Sign up |
 |---|---|---|
@@ -101,7 +101,7 @@ python predict.py scrape
 python predict.py scrape --pages 5          # more pages per keyword
 ```
 
-Fetches listings across a rotating batch of 10 keywords/day (36-keyword pool, full cycle every 4 days) × 10 India cities — all within Adzuna's 250-call free tier. Results append to `data/scraped_jobs.csv`.
+Fetches listings across a rotating batch of 10 keywords/day (36-keyword pool, full cycle every 4 days) × 10 India cities - all within Adzuna's 250-call free tier. Results append to `data/scraped_jobs.csv`.
 
 ### Train the model
 
@@ -118,7 +118,7 @@ R²         : 0.243
 Samples    : 3,263
 ```
 
-Target encoders and outlier fences are fit on the training split only — no leakage. An earlier version scored a misleading R² of 0.88 before this was fixed.
+Target encoders and outlier fences are fit on the training split only - no leakage. An earlier version scored a misleading R² of 0.88 before this was fixed.
 
 ### Generate the dashboard
 
@@ -163,7 +163,7 @@ make test        # or: python -m pytest tests/ -v
 
 ## Automation
 
-The pipeline runs entirely on GitHub — your machine can be off:
+The pipeline runs entirely on GitHub - your machine can be off:
 
 | Workflow | Trigger | What it does |
 |---|---|---|
@@ -185,9 +185,9 @@ python predict.py serve     # http://127.0.0.1:8080
 
 | | |
 |---|---|
-| **Algorithms** | Random Forest, XGBoost — best chosen by 5-fold CV MAE |
+| **Algorithms** | Random Forest, XGBoost - best chosen by 5-fold CV MAE |
 | **Target variable** | Log-transformed salary (LPA), reversed with `expm1` at inference |
-| **Encoding** | Group-mean target encoding for `job_title`, `city`, `company` — fit on training split only |
+| **Encoding** | Group-mean target encoding for `job_title`, `city`, `company` - fit on training split only |
 | **Features** | Experience years, seniority level, company tier, city, job title, top-20 skill flags (26 total) |
 | **Confidence interval** | Random Forest: 10th–90th percentile across trees · XGBoost: ±15% fallback |
 | **Leakage guard** | `train_test_split` first, then encoders and outlier fences fit exclusively on `df_train` |
@@ -211,9 +211,9 @@ python predict.py serve     # http://127.0.0.1:8080
 
 ## Skills Demonstrated
 
-- **API integration** — retry/backoff, call budget guard, daily keyword rotation within a free-tier quota
-- **Data engineering** — multi-format salary/experience parsing, city normalisation, incremental SQLite upsert (unit-tested)
-- **Machine learning** — model selection via cross-validation, log-target regression, leakage-safe target encoding for high-cardinality categoricals
-- **Automation** — GitHub Actions cloud pipeline (scrape → retrain → commit), local Flask server
-- **Frontend** — self-contained HTML dashboard, dark mode, Chart.js, CSS custom properties, interactive salary predictor
-- **Software engineering** — CLI design with Typer, 42 unit tests, clean separation of scraping / pipeline / model / report layers
+- **API integration** - retry/backoff, call budget guard, daily keyword rotation within a free-tier quota
+- **Data engineering** - multi-format salary/experience parsing, city normalisation, incremental SQLite upsert (unit-tested)
+- **Machine learning** - model selection via cross-validation, log-target regression, leakage-safe target encoding for high-cardinality categoricals
+- **Automation** - GitHub Actions cloud pipeline (scrape → retrain → commit), local Flask server
+- **Frontend** - self-contained HTML dashboard, dark mode, Chart.js, CSS custom properties, interactive salary predictor
+- **Software engineering** - CLI design with Typer, 42 unit tests, clean separation of scraping / pipeline / model / report layers
