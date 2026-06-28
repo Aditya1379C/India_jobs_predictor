@@ -12,6 +12,16 @@ An end-to-end Python data pipeline that scrapes India tech job listings via publ
 
 ---
 
+## Outcomes
+
+**Scope:** Trained on 3,263 live job listings scraped daily from real job APIs to answer a concrete question: what salary should a tech role in India command given its title, experience, location, and skills? The pipeline turns messy, unstructured listings into a feature set and a deployable prediction model (XGBoost · MAE ₹4.21 LPA · R² 0.243).
+
+**Iterative development:** The model was refined across multiple cycles, handling salary-range parsing, experience extraction, group-mean encoding, and leakage prevention, with each issue and fix documented in `MODEL_ISSUES_AND_FIXES.md`. The process reflects genuine ML hygiene: framing the target, engineering features, validating against leakage, and iterating until the metrics held up.
+
+**End-to-end pipeline:** The project delivers a fully automated workflow from live API scrape through cleaning, storage, training, and a shareable HTML dashboard, covering the complete ML engineering loop, scheduled daily on GitHub Actions and runnable from a single CLI.
+
+---
+
 ## What Makes This Different
 
 Most salary data projects work off a static Kaggle CSV. This one pulls **live data** from real job APIs every day, processes it through a production-style engineering pipeline, trains a model with proper ML hygiene, and deploys a dashboard - the same workflow you'd build at a company.
