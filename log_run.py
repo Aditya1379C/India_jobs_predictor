@@ -56,8 +56,11 @@ def log_run(metrics: dict) -> Path:
 
     if _HISTORY_PATH.exists():
         existing = _HISTORY_PATH.read_text()
+        # Find where the data rows start (after the header + divider lines)
         divider_end = existing.index("\n", existing.index("|---")) + 1
-        new_content = existing[:divider_end] + row + existing[divider_end:]
+        old_data_rows = existing[divider_end:]
+        # Always rewrite the header so column changes stay in sync with old data rows
+        new_content = _HEADER + row + old_data_rows
     else:
         new_content = _HEADER + row
 
