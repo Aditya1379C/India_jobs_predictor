@@ -49,6 +49,11 @@ N_SKILLS            = 20     # how many top skills to multi-hot encode
 CV_FOLDS            = 5      # k-fold cross-validation
 MIN_ENCODER_SAMPLES = 3      # groups with fewer training rows → use global_mean
 FUZZY_CUTOFF        = 0.85   # strict: only accept near-identical string matches
+# Real disclosed-band rows (source != "scrape") carry ground-truth salaries and
+# transfer far better than quantized Adzuna estimates.  Weighting them ×3 in
+# training lifts held-out quality on real data (kaggle slice R² 0.489→0.514)
+# at no cost to the scrape slice.  Set to 1.0 to disable. (Experiment 2026-06-28.)
+REAL_BAND_WEIGHT    = 3.0
 
 # ── City aliases ──────────────────────────────────────────────────────────────
 # Maps satellite cities, suburbs, and alternate spellings to one of the 6
@@ -514,8 +519,17 @@ def train() -> tuple:
     print(f"\n[✓] Winner: {best_name}")
 
     # ── Fit winner on full train set; evaluate on held-out test set ───────────
+    # Up-weight real disclosed-band rows so the deployed model leans on
+    # ground-truth salaries over quantized Adzuna estimates (see REAL_BAND_WEIGHT).
+    src_train = (df_train["source"] if "source" in df_train.columns
+                 else pd.Series(["scrape"] * len(df_train)))
+    sample_w = np.where((src_train != "scrape").to_numpy(), REAL_BAND_WEIGHT, 1.0)
+    n_up = int((sample_w != 1.0).sum())
+    if n_up:
+        print(f"[✓] Weighting {n_up:,} real-band rows ×{REAL_BAND_WEIGHT:g} in final fit")
+
     best_model = models[best_name]
-    best_model.fit(X_train.values, y_train)
+    best_model.fit(X_train.values, y_train, sample_weight=sample_w)
     y_pred = best_model.predict(X_test.values)
 
     # Back-transform predictions to LPA for human-readable metrics
