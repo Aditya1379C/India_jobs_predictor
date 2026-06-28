@@ -59,7 +59,8 @@ OUTPUT_PATH = str(_HERE / "data" / "scraped_jobs.csv")
 
 CSV_HEADERS = [
     "job_title", "company", "location", "experience",
-    "salary", "skills", "date_posted", "description",
+    "salary", "salary_min", "salary_max", "salary_is_predicted",
+    "skills", "date_posted", "description",
 ]
 
 # Keep stored descriptions to a sane size — enough for skill/salary
@@ -352,9 +353,14 @@ def _adzuna_fetch(keyword: str | None, city: str, page: int = 1,
         sal_max = item.get("salary_max") or 0
         avg_sal = (sal_min + sal_max) / 2 if (sal_min or sal_max) else 0
         # Adzuna flags model-estimated salaries; optionally exclude them
-        if item.get("salary_is_predicted") in (1, "1", True) and not INCLUDE_PREDICTED_SALARIES:
-            avg_sal = 0
-        salary  = _to_lpa(avg_sal, currency="INR", period="YEAR")
+        is_predicted = 1 if item.get("salary_is_predicted") in (1, "1", True) else 0
+        if is_predicted and not INCLUDE_PREDICTED_SALARIES:
+            avg_sal = sal_min = sal_max = 0
+        salary      = _to_lpa(avg_sal, currency="INR", period="YEAR")
+        # Persist the raw band (not just the midpoint) so the model can learn
+        # from band width and so real-vs-estimated salaries stay separable.
+        salary_min  = _to_lpa(sal_min, currency="INR", period="YEAR")
+        salary_max  = _to_lpa(sal_max, currency="INR", period="YEAR")
 
         description = item.get("description", "")
         skills      = _extract_skills_from_text(description)
@@ -384,6 +390,9 @@ def _adzuna_fetch(keyword: str | None, city: str, page: int = 1,
             "location":    location,
             "experience":  "Not Mentioned",   # not in Adzuna response; imputed by pipeline
             "salary":      salary,
+            "salary_min":  salary_min,
+            "salary_max":  salary_max,
+            "salary_is_predicted": is_predicted,
             "skills":      skills,
             "date_posted": date_posted,
             "description": description[:MAX_DESCRIPTION_CHARS],
@@ -492,6 +501,9 @@ def _jsearch_fetch(keyword: str, city: str, page: int = 1) -> list[dict] | None:
         period     = item.get("job_salary_period") or "YEAR"
         avg_sal    = (sal_min + sal_max) / 2 if (sal_min or sal_max) else 0
         salary     = _to_lpa(avg_sal, currency=currency, period=period)
+        # JSearch returns actual posted bands (never model-estimated)
+        salary_min = _to_lpa(sal_min, currency=currency, period=period)
+        salary_max = _to_lpa(sal_max, currency=currency, period=period)
 
         desc = item.get("job_description", "")
 
@@ -536,6 +548,9 @@ def _jsearch_fetch(keyword: str, city: str, page: int = 1) -> list[dict] | None:
             "location":    location,
             "experience":  experience,
             "salary":      salary,
+            "salary_min":  salary_min,
+            "salary_max":  salary_max,
+            "salary_is_predicted": 0,
             "skills":      skills,
             "date_posted": date_posted,
             "description": desc[:MAX_DESCRIPTION_CHARS],

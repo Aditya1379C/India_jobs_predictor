@@ -129,17 +129,55 @@ def _normalize_date(raw: str) -> str:
 
 
 # ── Column name map ─────────────────────────────────────────────────────────
-# Rename raw CSV columns to clean snake_case names.
-# Adjust keys here if your CSV has different column names.
+# Maps many raw header spellings → our clean snake_case names.  Matching is
+# case-insensitive and ignores spaces/underscores (see _canonicalize_columns),
+# so "Job Title", "job_title", "JOB TITLE" and "jobtitle" all collapse to the
+# same key.  This lets arbitrary Kaggle CSVs flow through the same pipeline as
+# the scraper output without hand-editing headers per dataset.
 COLUMN_MAP = {
-    "Job Title":        "job_title",
-    "Company":          "company",
-    "Location":         "location",
-    "Experience":       "experience",
-    "Salary":           "salary",
-    "Skills":           "skills",
-    "Date Posted":      "date_posted",
+    # job_title
+    "jobtitle": "job_title", "title": "job_title", "designation": "job_title",
+    "role": "job_title", "jobrole": "job_title", "position": "job_title",
+    "job": "job_title",
+    # company
+    "company": "company", "companyname": "company", "employer": "company",
+    "organization": "company", "organisation": "company",
+    # location
+    "location": "location", "city": "location", "joblocation": "location",
+    "place": "location",
+    # experience (raw string; parsed to experience_years downstream)
+    "experience": "experience", "experiencerequired": "experience",
+    "yearsofexperience": "experience", "exp": "experience",
+    # salary (raw string; parsed to salary_lpa downstream)
+    "salary": "salary", "salaryestimate": "salary", "avgsalary": "salary",
+    "averagesalary": "salary", "ctc": "salary", "package": "salary",
+    "annualsalary": "salary", "salaryinlpa": "salary",
+    # skills
+    "skills": "skills", "keyskills": "skills", "skill": "skills",
+    "skillsrequired": "skills", "techstack": "skills",
+    # date_posted
+    "dateposted": "date_posted", "date": "date_posted", "posted": "date_posted",
+    "postingdate": "date_posted",
 }
+
+
+def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rename raw CSV headers to our snake_case schema using COLUMN_MAP, matching
+    case- and separator-insensitively.  Columns already in canonical form (e.g.
+    the scraper's own snake_case output) pass through untouched; unrecognised
+    columns are kept as-is.  First match wins when two raw columns map to the
+    same target (avoids a downstream column collision).
+    """
+    rename: dict[str, str] = {}
+    taken: set[str] = set()
+    for col in df.columns:
+        key = re.sub(r"[\s_]+", "", str(col).strip().lower())
+        target = COLUMN_MAP.get(key)
+        if target and target not in taken and target not in df.columns:
+            rename[col] = target
+            taken.add(target)
+    return df.rename(columns=rename)
 
 
 def load_csv(path: str) -> pd.DataFrame:
@@ -198,12 +236,17 @@ def _parse_salary_lpa(raw: str) -> float | None:
     return round(avg, 2)
 
 
-def clean(df: pd.DataFrame) -> pd.DataFrame:
-    """Rename, drop bad rows, parse salary & experience to numbers."""
+def clean(df: pd.DataFrame, source: str = "scrape") -> pd.DataFrame:
+    """
+    Rename, drop bad rows, parse salary & experience to numbers.
 
-    # ── Rename only columns that exist in this CSV ──────────────────────────
-    existing = {k: v for k, v in COLUMN_MAP.items() if k in df.columns}
-    df = df.rename(columns=existing)
+    `source` tags every row (e.g. "scrape", "kaggle:<dataset>") in a `source`
+    column so blended training data stays traceable — we can slice metrics by
+    origin and tell whether richer external rows actually lift the model.
+    """
+
+    # ── Canonicalise headers (case/separator-insensitive) ───────────────────
+    df = _canonicalize_columns(df)
 
     # ── Drop fully empty rows ────────────────────────────────────────────────
     df = df.dropna(how="all")
@@ -213,6 +256,24 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
         df["salary_lpa"] = df["salary"].astype(str).map(_parse_salary_lpa)
     else:
         df["salary_lpa"] = None
+
+    # ── Salary band (min/max) — kept alongside the midpoint so the model can
+    #    learn from band width and so real vs Adzuna-estimated salaries stay
+    #    separable via salary_is_predicted. Missing in pre-band CSVs → None.
+    for src, dst in (("salary_min", "salary_min_lpa"),
+                     ("salary_max", "salary_max_lpa")):
+        if src in df.columns:
+            df[dst] = df[src].astype(str).map(_parse_salary_lpa)
+        else:
+            df[dst] = None
+
+    if "salary_is_predicted" in df.columns:
+        df["salary_is_predicted"] = (
+            pd.to_numeric(df["salary_is_predicted"], errors="coerce")
+              .fillna(0).astype(int)
+        )
+    else:
+        df["salary_is_predicted"] = 0
 
     # ── Experience ───────────────────────────────────────────────────────────
     if "experience" in df.columns:
@@ -274,6 +335,9 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(subset=["salary_lpa"])
     print(f"[✓] Kept {len(df):,} rows after dropping rows without salary (removed {before - len(df):,})")
 
+    # ── Provenance tag — lets us slice metrics by data origin ─────────────────
+    df["source"] = source
+
     df = df.reset_index(drop=True)
     _validate_clean(df)
     return df
@@ -326,6 +390,9 @@ def save_to_db(df: pd.DataFrame, db_path: str = DB_PATH) -> None:
             # Backfill company_tier for rows that predate the column
             if "company_tier" not in existing.columns and "company" in combined.columns:
                 combined["company_tier"] = combined["company"].apply(_assign_company_tier)
+            # Legacy rows predate the provenance tag → they were all scraped.
+            if "source" in combined.columns:
+                combined["source"] = combined["source"].fillna("scrape")
             dedup_cols = [c for c in _DEDUP_COLS if c in combined.columns]
             if dedup_cols:
                 combined = combined.drop_duplicates(subset=dedup_cols, keep="last")
@@ -361,9 +428,9 @@ def load_from_db(db_path: str = DB_PATH) -> pd.DataFrame:
     return df
 
 
-def run(csv_path: str) -> pd.DataFrame:
+def run(csv_path: str, source: str = "scrape") -> pd.DataFrame:
     df_raw = load_csv(csv_path)
-    df_clean = clean(df_raw)
+    df_clean = clean(df_raw, source=source)
     save_to_db(df_clean)
     return df_clean
 
@@ -378,7 +445,7 @@ def run_with_scraper(pages: int = 3, keywords: list | None = None) -> pd.DataFra
             "  • Check your internet connection\n"
             "  • Check your API credentials in .env and try again in a few minutes"
         )
-    return run(csv_path)
+    return run(csv_path, source="scrape")
 
 
 # ── CLI entry point ──────────────────────────────────────────────────────────
@@ -388,9 +455,12 @@ if __name__ == "__main__":
     group.add_argument("--csv",    help="Path to existing CSV file")
     group.add_argument("--scrape", action="store_true", help="Fetch fresh data via API (Adzuna / JSearch)")
     parser.add_argument("--pages", type=int, default=3, help="Pages per keyword when scraping (default: 3)")
+    parser.add_argument("--source", default=None,
+                        help="Provenance tag for --csv rows (e.g. 'kaggle:india-tech-salaries'). "
+                             "Defaults to 'scrape'.")
     args = parser.parse_args()
 
     if args.scrape:
         run_with_scraper(pages=args.pages)
     else:
-        run(args.csv)
+        run(args.csv, source=args.source or "scrape")

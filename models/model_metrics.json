@@ -1,7 +1,7 @@
 {
   "best_model": "Random Forest",
-  "test_mae_lpa": 3.5,
-  "test_r2": 0.326,
-  "n_samples": 8065,
+  "test_mae_lpa": 3.75,
+  "test_r2": 0.413,
+  "n_samples": 10719,
   "n_features": 28
 }

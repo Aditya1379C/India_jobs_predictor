@@ -41,6 +41,7 @@ ENCODERS_PATH    = str(_HERE / "models" / "encoders.pkl")
 IMPORTANCE_PATH  = str(_HERE / "models" / "feature_importance.json")
 METRICS_PATH     = str(_HERE / "models" / "model_metrics.json")
 TOP_SKILLS_PATH  = str(_HERE / "models" / "top_skills.pkl")
+BAND_MODEL_PATH  = str(_HERE / "models" / "band_model.pkl")
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TARGET_COL          = "salary_lpa"
@@ -376,6 +377,53 @@ def _clean_salary(df: pd.DataFrame,
     return df.reset_index(drop=True), high_fence
 
 
+_BAND_TARGETS = ("salary_min_lpa", "salary_max_lpa")
+_MIN_BAND_ROWS = 200   # below this, band heads are too noisy to bother saving
+
+
+def _train_band_heads(X_train: pd.DataFrame, df_train: pd.DataFrame,
+                      X_test: pd.DataFrame, df_test: pd.DataFrame) -> tuple[dict, dict]:
+    """
+    Train auxiliary RF heads that predict the real salary band (min & max LPA),
+    reusing the main model's already-built features so prediction needs only one
+    feature build.  Only rows that actually carry a disclosed band train these
+    heads (currently the Kaggle-sourced rows); the midpoint model is unaffected.
+
+    Returns (heads, band_metrics):
+      heads        — {target: fitted_regressor} (+ "feature_cols" for alignment)
+      band_metrics — {target: {n, r2, mae_lpa}} on the held-out band rows
+    """
+    heads: dict = {}
+    band_metrics: dict = {}
+    feature_cols = list(X_train.columns)
+
+    for tgt in _BAND_TARGETS:
+        if tgt not in df_train.columns:
+            continue
+        m_tr = (df_train[tgt].notna() & (df_train[tgt] >= 1.0)).to_numpy()
+        if int(m_tr.sum()) < _MIN_BAND_ROWS:
+            continue
+        y_tr = np.log1p(df_train.loc[m_tr, tgt].to_numpy(dtype=float))
+        rf = RandomForestRegressor(n_estimators=300, max_depth=20,
+                                   min_samples_leaf=3, random_state=42, n_jobs=-1)
+        rf.fit(X_train.values[m_tr], y_tr)
+        heads[tgt] = rf
+
+        m_te = (df_test[tgt].notna() & (df_test[tgt] >= 1.0)).to_numpy()
+        if int(m_te.sum()) >= 2:
+            pred = np.expm1(rf.predict(X_test.values[m_te]))
+            y_te = df_test.loc[m_te, tgt].to_numpy(dtype=float)
+            band_metrics[tgt] = {
+                "n":       int(m_te.sum()),
+                "r2":      round(float(r2_score(y_te, pred)), 3),
+                "mae_lpa": round(float(mean_absolute_error(y_te, pred)), 2),
+            }
+
+    if heads:
+        heads["feature_cols"] = feature_cols
+    return heads, band_metrics
+
+
 def train() -> tuple:
     """
     Load data, engineer features, train RF + XGBoost,
@@ -484,6 +532,36 @@ def train() -> tuple:
     print(f"[✓] Test MAE : ₹{mae:.2f} LPA")
     print(f"[✓] R² (log) : {r2:.3f}  |  R² (LPA) : {r2_lpa:.3f}")
 
+    # ── Metrics by data source ────────────────────────────────────────────────
+    # df_test rows align positionally with y_pred (build_features preserves order),
+    # so we can slice the held-out predictions by provenance and see whether
+    # blended-in real-band data (e.g. source="kaggle:*") behaves differently from
+    # the quantized scrape data. R² needs ≥2 rows; skipped for tiny slices.
+    by_source: dict = {}
+    src_series = (df_test["source"] if "source" in df_test.columns
+                  else pd.Series(["scrape"] * len(df_test)))
+    print("\n[→] Test metrics by source:")
+    for src in src_series.unique():
+        mask = (src_series == src).to_numpy()
+        n = int(mask.sum())
+        s_mae = float(mean_absolute_error(y_test_lpa[mask], y_pred_lpa[mask]))
+        s_r2  = float(r2_score(y_test_lpa[mask], y_pred_lpa[mask])) if n >= 2 else float("nan")
+        by_source[str(src)] = {"n": n, "mae_lpa": round(s_mae, 2),
+                               "r2": round(s_r2, 3) if n >= 2 else None}
+        r2_str = f"{s_r2:.3f}" if n >= 2 else "  n/a"
+        print(f"    {str(src):28s} n={n:5d}  MAE ₹{s_mae:5.2f}  R² {r2_str}")
+
+    # ── Auxiliary band heads (real salary min/max) ────────────────────────────
+    # Trained only on rows with a disclosed band; gives predict() realistic
+    # ranges grounded in real data instead of the ±15%/tree-percentile heuristic.
+    band_heads, band_metrics = _train_band_heads(X_train, df_train, X_test, df_test)
+    if band_metrics:
+        print("\n[→] Band heads (real salary range), held-out:")
+        for tgt, bm in band_metrics.items():
+            print(f"    {tgt:18s} n={bm['n']:5d}  MAE ₹{bm['mae_lpa']:5.2f}  R² {bm['r2']:.3f}")
+    else:
+        print("\n[i] No band heads trained (insufficient disclosed-band rows).")
+
     # ── Feature importance ────────────────────────────────────────────────────
     if hasattr(best_model, "feature_importances_"):
         importances = best_model.feature_importances_
@@ -501,7 +579,11 @@ def train() -> tuple:
         "n_features":        len(feature_cols),
         "n_samples":         len(df_train) + len(df_test),
         "cv_results":        cv_results,
+        "metrics_by_source": by_source,
+        "band_metrics":      band_metrics,
         "feature_importance": importance_sorted,
+        # sklearn objects — consumed by save_model, stripped before JSON dump
+        "_band_models":      band_heads,
     }
 
     return best_model, encoders, top_skills, feature_cols, metrics
@@ -523,6 +605,17 @@ def save_model(model, encoders, top_skills, feature_cols, metrics) -> None:
 
     with open(TOP_SKILLS_PATH, "wb") as f:
         pickle.dump(top_skills, f)
+
+    # Auxiliary band heads (optional) — stale file removed when none were trained
+    # so load_model never pairs an old band model with a fresh main model.
+    band_models = metrics.get("_band_models") or {}
+    if band_models:
+        with open(BAND_MODEL_PATH, "wb") as f:
+            pickle.dump({"band_models": band_models,
+                         "log_transform": LOG_TRANSFORM_TARGET}, f)
+        print(f"[✓] Band heads saved   → {BAND_MODEL_PATH}")
+    elif os.path.exists(BAND_MODEL_PATH):
+        os.remove(BAND_MODEL_PATH)
 
     with open(IMPORTANCE_PATH, "w") as f:
         json.dump(metrics["feature_importance"], f, indent=2)
@@ -565,8 +658,15 @@ def load_model(force_reload: bool = False):
     with open(TOP_SKILLS_PATH, "rb") as f:
         top_skills = pickle.load(f)
 
+    # Optional band heads (real salary min/max) — absent on models trained
+    # before band data existed → predict() falls back to its heuristic range.
+    band_models = None
+    if os.path.exists(BAND_MODEL_PATH):
+        with open(BAND_MODEL_PATH, "rb") as f:
+            band_models = pickle.load(f).get("band_models")
+
     artefacts = (payload["model"], encoders, top_skills, payload["feature_cols"],
-                 payload.get("log_transform", LOG_TRANSFORM_TARGET))
+                 payload.get("log_transform", LOG_TRANSFORM_TARGET), band_models)
     _MODEL_CACHE.update({"mtime": mtime, "artefacts": artefacts})
     return artefacts
 
@@ -584,7 +684,7 @@ def predict(job_title: str, city: str, experience_years: float,
         skills:           comma-separated, e.g. "Python, SQL, Machine Learning"
         company:          optional, e.g. "Infosys"
     """
-    model, encoders, top_skills, feature_cols, log_transform = load_model()
+    model, encoders, top_skills, feature_cols, log_transform, band_models = load_model()
 
     input_df = pd.DataFrame([{
         "job_title":        job_title,
@@ -603,7 +703,7 @@ def predict(job_title: str, city: str, experience_years: float,
             X[col] = 0
     X_arr = np.asarray(X[feature_cols], dtype=float)
 
-    # Confidence interval via individual tree predictions (RF only; XGBoost falls back to ±15%)
+    # Point estimate (mean over trees for RF; single predict for XGBoost)
     try:
         trees = model.estimators_   # AttributeError for XGBRegressor → except branch
         tree_preds = np.array([t.predict(X_arr)[0] for t in trees])
@@ -619,6 +719,21 @@ def predict(job_title: str, city: str, experience_years: float,
         predicted = round(raw_pred, 2)
         low, high = round(predicted * 0.85, 2), round(predicted * 1.15, 2)
 
+    # Prefer a real salary range from the band heads when available — grounded
+    # in disclosed min/max data rather than the model-uncertainty heuristic.
+    range_source = "model_spread"
+    if band_models and "salary_min_lpa" in band_models and "salary_max_lpa" in band_models:
+        b_cols = band_models.get("feature_cols", feature_cols)
+        Xb = np.asarray(X.reindex(columns=b_cols, fill_value=0), dtype=float)
+        b_low  = float(band_models["salary_min_lpa"].predict(Xb)[0])
+        b_high = float(band_models["salary_max_lpa"].predict(Xb)[0])
+        if log_transform:
+            b_low, b_high = float(np.expm1(b_low)), float(np.expm1(b_high))
+        # Keep the band sane: low ≤ point estimate ≤ high.
+        low  = round(min(b_low, predicted), 2)
+        high = round(max(b_high, predicted), 2)
+        range_source = "band_model"
+
     return {
         "job_title":             job_title,
         "city":                  city,
@@ -627,6 +742,7 @@ def predict(job_title: str, city: str, experience_years: float,
         "predicted_salary_lpa":  predicted,
         "range_low_lpa":         low,
         "range_high_lpa":        high,
+        "range_source":          range_source,
     }
 
 
