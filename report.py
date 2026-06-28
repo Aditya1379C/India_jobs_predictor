@@ -42,6 +42,19 @@ def compute_stats(df: pd.DataFrame) -> dict:
     avg_salary    = round(df["salary_lpa"].mean(), 1)    if has_salary else None
     median_salary = round(df["salary_lpa"].median(), 1)  if has_salary else None
 
+    # Latest date in the dataset (for the "scraped until" KPI subtitle)
+    if "date_posted" in df.columns:
+        valid_dates = df["date_posted"].dropna()
+        valid_dates = valid_dates[valid_dates.str.match(r"\d{4}-\d{2}-\d{2}", na=False)]
+        if len(valid_dates):
+            from datetime import datetime
+            raw = valid_dates.max()
+            latest_date = datetime.strptime(raw, "%Y-%m-%d").strftime("%-d-%-m-%Y")
+        else:
+            latest_date = "N/A"
+    else:
+        latest_date = "N/A"
+
     # ── Section 1: Top cities ─────────────────────────────────────────────────
     top_cities = df["city"].value_counts().head(10)
 
@@ -192,6 +205,7 @@ def compute_stats(df: pd.DataFrame) -> dict:
             "unique_roles":  unique_roles,
             "avg_salary":    avg_salary,
             "median_salary": median_salary,
+            "latest_date":   latest_date,
         },
         "top_cities":    {"labels": top_cities.index.tolist(), "values": top_cities.values.tolist()},
         "top_roles":     {"labels": top_roles.index.tolist(),  "values": top_roles.values.tolist()},
@@ -561,7 +575,7 @@ def build_html(stats: dict) -> str:
     <div class="kpi" style="--kpi-light:#2563eb;--kpi-dark:#60a5fa">
       <span class="kpi-icon">💼</span>
       <div class="kpi-val">{kpis['total_jobs']:,}</div>
-      <div class="kpi-label">Jobs Scraped</div>
+      <div class="kpi-label">Jobs Scraped Until {kpis['latest_date']}</div>
       <div class="kpi-sub">Live data from Adzuna API</div>
     </div>
     <div class="kpi" style="--kpi-light:#059669;--kpi-dark:#34d399">

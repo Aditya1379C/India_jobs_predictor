@@ -17,7 +17,8 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git checkout *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git -C /Users/adityajaisingh/Claude/Projects/PYthon/india_jobs_predictor status --short)"
     ]
   }
 }

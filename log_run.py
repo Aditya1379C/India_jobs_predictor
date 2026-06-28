@@ -9,33 +9,47 @@ GitHub Actions workflow (train.yml) — no need to run manually.
 """
 
 import csv
+import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-_HERE = Path(__file__).parent
-_CSV_PATH = _HERE / "data" / "scraped_jobs.csv"
+_HERE         = Path(__file__).parent
+_CSV_PATH     = _HERE / "data" / "scraped_jobs.csv"
+_DB_PATH      = _HERE / "data" / "jobs.db"
 _HISTORY_PATH = _HERE / "RUN_HISTORY.md"
 
 _HEADER = (
     "# Run History\n\n"
     "Auto-generated log of each scrape → retrain → report cycle. Newest first.\n\n"
-    "| Date (UTC) | Total Jobs | Training Samples | Model | Test MAE (₹ LPA) | R² | Features |\n"
-    "|---|---|---|---|---|---|---|\n"
+    "| Date (UTC) | Total Scraped | Jobs in DB | Training Samples | Model | Test MAE (₹ LPA) | R² | Features |\n"
+    "|---|---|---|---|---|---|---|---|\n"
 )
 
 
-def _count_jobs() -> int:
+def _count_csv() -> int:
+    """Count raw rows in the accumulated CSV (before any cleaning)."""
+    if not _CSV_PATH.exists():
+        return 0
     with open(_CSV_PATH, newline="", encoding="utf-8") as f:
-        return sum(1 for _ in csv.reader(f)) - 1   # minus header row
+        return sum(1 for _ in csv.reader(f)) - 1  # minus header row
+
+
+def _count_db() -> int:
+    """Count rows in the cleaned SQLite DB (after salary/experience parsing)."""
+    if _DB_PATH.exists():
+        with sqlite3.connect(_DB_PATH) as conn:
+            return conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+    return 0
 
 
 def log_run(metrics: dict) -> Path:
     """Prepend a row built from a model.py metrics dict to RUN_HISTORY.md."""
-    total_jobs = _count_jobs()
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total_scraped = _count_csv()
+    jobs_in_db    = _count_db()
+    date          = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     row = (
-        f"| {date} | {total_jobs:,} | {metrics['n_samples']:,} | "
+        f"| {date} | {total_scraped:,} | {jobs_in_db:,} | {metrics['n_samples']:,} | "
         f"{metrics['best_model']} | {metrics['test_mae_lpa']} | "
         f"{metrics['test_r2']} | {metrics['n_features']} |\n"
     )

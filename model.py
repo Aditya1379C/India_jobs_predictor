@@ -315,10 +315,21 @@ def build_features(df: pd.DataFrame, encoders: dict | None = None,
         df["company_tier"] = df["company"].fillna("Unknown").apply(_assign_company_tier)
     df["company_tier_enc"] = df["company_tier"].map(lambda t: _TIER_ORDER.get(t, 0))
 
+    # ── Interaction features ──────────────────────────────────────────────────
+    # exp_x_seniority: captures that "senior with 10 yrs" earns very differently
+    # from "senior with 3 yrs" — neither experience_years nor seniority_enc alone
+    # can express this; only their product can.
+    # exp_squared: salary growth is non-linear (junior->mid jump > mid->senior
+    # per year), so a quadratic term lets tree models split on this curve more
+    # efficiently than the linear experience_years column alone.
+    df["exp_x_seniority"] = df["experience_years"] * df["seniority_enc"]
+    df["exp_squared"]     = df["experience_years"] ** 2
+
     # ── Final feature columns ─────────────────────────────────────────────────
     skill_cols   = [f"skill_{s.replace(' ', '_')}" for s in top_skills]
     feature_cols = (["job_title_enc", "city_enc", "company_enc",
-                     "company_tier_enc", "seniority_enc", "experience_years"] + skill_cols)
+                     "company_tier_enc", "seniority_enc", "experience_years",
+                     "exp_x_seniority", "exp_squared"] + skill_cols)
     feature_cols = [c for c in feature_cols if c in df.columns]
 
     return df[feature_cols], encoders, top_skills, feature_cols
