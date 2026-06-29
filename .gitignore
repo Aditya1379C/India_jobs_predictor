@@ -15,6 +15,9 @@ venv/
 # report/dashboard.html + models/*.pkl + models/*.json (git add -f),
 # so those specific files do get committed despite being listed here.
 data/jobs.db
+# Local DB backups (e.g. jobs.db.bak-pre-kaggle) — never commit
+data/*.bak-*
+data/*.db.bak*
 models/*.pkl
 models/*.json
 report/
