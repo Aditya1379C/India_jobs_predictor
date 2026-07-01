@@ -42,10 +42,25 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Clean + retrain + regenerate report
+      - name: Load data (scrape + Kaggle real bands)
+        # jobs.db is gitignored, so CI rebuilds it from the committed CSVs.
+        # Load the scrape CSV *and* the Kaggle real-band CSV so the retrain
+        # reproduces the blended model (~R2 0.42), not a scrape-only ~0.17.
         run: |
           python predict.py pipeline --csv data/scraped_jobs.csv
-          python predict.py train
+          python data_pipeline.py --csv data/kaggle_indian_tech_jobs_2026.csv --source kaggle:indian-tech-jobs-2026
+
+      - name: Retrain
+        run: python predict.py train
+
+      - name: Grade against contract (loop evaluator)
+        # Evaluator role, separate from training. REJECT (exit 1) fails the job
+        # BEFORE the commit step, so a regressed or leaked model is never pushed.
+        # --no-tests: the unit suite is gated separately in ci.yml.
+        run: python .loop/evaluate.py --no-tests
+
+      - name: Regenerate report + log run
+        run: |
           python predict.py report
           python log_run.py
 

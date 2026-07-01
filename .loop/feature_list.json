@@ -1,0 +1,45 @@
+{
+  "_comment": "Candidate-improvements queue for the salary model. One entry per idea, each with a testable acceptance criterion so the evaluator (or a human) can tell whether it actually worked. Derived from MODEL_ISSUES_AND_FIXES.md pending items. Status: queued | in_progress | shipped | rejected. Do not delete rejected entries; they are the loop's memory of dead ends.",
+  "candidates": [
+    {
+      "id": "band-model-target",
+      "title": "Predict [log(min), log(max)] band instead of midpoint once DB has enough band rows",
+      "source": "MODEL_ISSUES pending: model-side band change",
+      "status": "queued",
+      "blocked_on": "DB needs ~1500 band-bearing rows (est. 3-4 weeks of scraping, or expand keyword/city pool)",
+      "acceptance": "Band heads hold min R2 >= 0.47 and max R2 >= 0.57 on held-out band rows; midpoint model R2 does not regress below contract floor."
+    },
+    {
+      "id": "more-real-band-sources",
+      "title": "Add more disclosed-salary sources (Naukri-style Kaggle dumps) over scaling quantized Adzuna",
+      "source": "MODEL_ISSUES takeaway: real bands beat feature engineering here",
+      "status": "queued",
+      "blocked_on": "license-clean dataset with real bands + experience",
+      "acceptance": "kaggle/real-source per-source R2 >= 0.50 and overall R2 improves vs current shipped run, with no per-source slice above the leakage ceiling."
+    },
+    {
+      "id": "interaction-features",
+      "title": "exp_x_seniority and exp_squared interaction features",
+      "source": "MODEL_ISSUES Issue 2",
+      "status": "shipped",
+      "acceptance": "Overall R2 improved (0.243 -> 0.326). Retained.",
+      "result": "Shipped; contributed the jump to 0.326 before Kaggle blend."
+    },
+    {
+      "id": "company-encoder-smoothing",
+      "title": "Bayesian smoothing on company target encoder",
+      "source": "MODEL_ISSUES follow-up flag after Kaggle blend",
+      "status": "rejected",
+      "acceptance": "R2 must beat the hard MIN_ENCODER_SAMPLES=3 cutoff (0.413).",
+      "result": "Rejected: smoothing lost at every strength (best 0.399 < 0.413). High company_enc importance is genuine signal. Do not retry."
+    },
+    {
+      "id": "filter-estimated-salaries",
+      "title": "Drop Adzuna salary_is_predicted=1 rows to reduce quantization noise",
+      "source": "MODEL_ISSUES experiment B",
+      "status": "rejected",
+      "acceptance": "N/A",
+      "result": "Not viable: validation scrape returned salary_is_predicted=0 for all rows; the predicted flag is not the quantization source."
+    }
+  ]
+}

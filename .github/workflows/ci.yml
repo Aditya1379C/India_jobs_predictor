@@ -19,3 +19,11 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m pytest tests/ -v
+
+      # Grade the committed model against .loop/contract.md, for visibility only.
+      # Non-blocking: the real gate is in train.yml, before the model is committed.
+      # This surfaces the SHIP/REJECT verdict on every push without failing builds
+      # for unrelated changes. --no-tests: the suite ran in the step above.
+      - name: Grade committed model against contract (report only)
+        continue-on-error: true
+        run: python .loop/evaluate.py --no-tests
