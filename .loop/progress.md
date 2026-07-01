@@ -12,8 +12,8 @@ the markers is human-maintained.
 ## Latest graded run (auto)
 
 - **Date:** 2026-07-01
-- **Model:** XGBoost, 28 features, 10,236 training samples
-- **Test R2 (LPA):** 0.361  |  **MAE:** 4.23 LPA
+- **Model:** XGBoost, 28 features, 10,472 training samples
+- **Test R2 (LPA):** 0.339  |  **MAE:** 4.28 LPA
 - **Contract:** PASS (SHIP)
 - **Committed on disk:** yes (models/model_metrics.json reflects this run)
 <!-- AUTO:END -->
