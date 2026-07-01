@@ -59,17 +59,18 @@ jobs:
         # --no-tests: the unit suite is gated separately in ci.yml.
         run: python .loop/evaluate.py --no-tests
 
-      - name: Regenerate report + log run
+      - name: Regenerate report + log run + refresh progress snapshot
         run: |
           python predict.py report
           python log_run.py
+          python .loop/update_progress.py
 
       - name: Commit updated model + dashboard + run history
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -f report/dashboard.html models/*.pkl models/*.json
-          git add RUN_HISTORY.md
+          git add RUN_HISTORY.md .loop/progress.md
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
