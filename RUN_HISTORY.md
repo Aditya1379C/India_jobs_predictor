@@ -4,6 +4,7 @@ Auto-generated log of each scrape → retrain → report cycle. Newest first.
 
 | Date (UTC) | Total Scraped | Jobs in DB | Training Samples | Model | Test MAE (₹ LPA) | R² | Features |
 |---|---|---|---|---|---|---|---|
+| 2026-07-14 | 42,207 | 11,853 | 11,270 | XGBoost | 4.33 | 0.36 | 28 |
 | 2026-07-13 | 41,990 | 11,833 | 11,285 | XGBoost | 4.21 | 0.355 | 28 |
 | 2026-07-12 | 41,608 | 11,790 | 11,244 | XGBoost | 4.25 | 0.351 | 28 |
 | 2026-07-11 | 41,192 | 11,742 | 11,198 | XGBoost | 4.19 | 0.367 | 28 |
