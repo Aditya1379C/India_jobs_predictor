@@ -26,6 +26,15 @@ next `queued` item in feature_list.json. Highest-value candidate is
 (kaggle R2 ~0.57 vs scrape ~0.22), so adding more license-clean disclosed-salary
 data is the next real gain, not feature engineering.
 
+## Split stability (2026-09-25)
+
+The train/test split is now hash-keyed on the dedup columns (`_stable_split` in
+model.py), so rows keep their side across daily retrains. The old seeded random
+split reshuffled the test set whenever the scrape added rows: over 8 simulated
+daily snapshots it swung R2 0.313-0.348 and MAE 4.33-4.59, causing ~1-in-4 gate
+REJECTs. Stable split: R2 0.351-0.353, MAE 4.45-4.47. MAE still sits ~0.04 under
+the 4.50 ceiling, so the data bottleneck below is now the real risk.
+
 ## Bottleneck right now (Rule IX)
 
 Data, not model. Documented ceiling ~0.5 with real bands, ~0.35 with quantized

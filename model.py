@@ -24,7 +24,7 @@ from typing import cast
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.model_selection import cross_val_score
 from sklearn.metrics import mean_absolute_error, r2_score
 from xgboost import XGBRegressor
 
@@ -429,6 +429,16 @@ def _train_band_heads(X_train: pd.DataFrame, df_train: pd.DataFrame,
     return heads, band_metrics
 
 
+def _stable_split(df: pd.DataFrame, test_size: float = 0.2) -> tuple:
+    """Deterministic train/test split keyed on each row's dedup columns."""
+    from data_pipeline import _DEDUP_COLS
+    key_cols = [c for c in _DEDUP_COLS if c in df.columns]
+    keys = df[key_cols].astype("string").fillna("")
+    buckets = pd.util.hash_pandas_object(keys, index=False).to_numpy() % 10_000
+    is_test = buckets < int(test_size * 10_000)
+    return df[~is_test], df[is_test]
+
+
 def train() -> tuple:
     """
     Load data, engineer features, train RF + XGBoost,
@@ -448,7 +458,10 @@ def train() -> tuple:
     #    rows are treated as outliers.
     # 2. build_features() encodes categories with training group means, so
     #    splitting first also prevents target-encoding leakage.
-    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+    # 3. Hash-based on the dedup key, so a row stays in train or test across
+    #    daily retrains. A seeded random split reshuffles the whole test set
+    #    whenever the scrape adds rows, making the gate metrics swing ±0.03 R2.
+    df_train, df_test = _stable_split(df, test_size=0.2)
     df_train = cast(pd.DataFrame, df_train).reset_index(drop=True)
     df_test  = cast(pd.DataFrame, df_test).reset_index(drop=True)
 
