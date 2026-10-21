@@ -1,7 +1,7 @@
 {
   "best_model": "XGBoost",
-  "test_mae_lpa": 4.36,
-  "test_r2": 0.346,
-  "n_samples": 16428,
+  "test_mae_lpa": 4.49,
+  "test_r2": 0.345,
+  "n_samples": 16632,
   "n_features": 28
 }
